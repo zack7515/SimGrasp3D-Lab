@@ -17,6 +17,7 @@ from .motion import (
     PipeObstacleSpec,
     TrajectoryData,
     TrajectoryFrame,
+    WaypointPlannerSpec,
 )
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "PipeObstacleSpec",
     "TrajectoryData",
     "TrajectoryFrame",
+    "WaypointPlannerSpec",
 ]

@@ -1,12 +1,21 @@
-"""以運動學與位置約束模擬軟管抽取連續動作。"""
+"""以六自由度運動學與幾何約束模擬軟管抽取連續動作。"""
 
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
+from simgrasp3d.geometry.collision import closest_point_on_segment, segment_distance
+from simgrasp3d.geometry.transforms import (
+    matrix_from_quaternion,
+    pose_matrix,
+    quaternion_from_matrix,
+    quaternion_slerp,
+    rpy_deg_from_matrix,
+)
 from simgrasp3d.models.motion import (
     HoseMotionSpec,
     MotionKeyframeSpec,
@@ -15,7 +24,22 @@ from simgrasp3d.models.motion import (
     TrajectoryFrame,
 )
 from simgrasp3d.models.specs import RobotSpec
-from simgrasp3d.robot.kinematics import solve_position_ik
+from simgrasp3d.robot.collision import evaluate_robot_clearance
+from simgrasp3d.robot.kinematics import solve_pose_ik
+from simgrasp3d.simulation.waypoint_planner import plan_safe_waypoints
+
+
+@dataclass(frozen=True)
+class _MotionState:
+    """關鍵幀插值後的一個 TCP 位置、姿態與夾取狀態。"""
+
+    time_s: float
+    phase: str
+    tcp_position: np.ndarray
+    tcp_rpy_deg: np.ndarray
+    tcp_rotation: np.ndarray
+    gripper_opening_m: float
+    attached: bool
 
 
 def load_hose_motion_spec(path: str | Path) -> HoseMotionSpec:
@@ -44,53 +68,6 @@ def _resample_polyline(
     )
 
 
-def _closest_point_on_segment(point: np.ndarray, start: np.ndarray, end: np.ndarray) -> np.ndarray:
-    direction = end - start
-    parameter = float(np.dot(point - start, direction) / np.dot(direction, direction))
-    return start + np.clip(parameter, 0.0, 1.0) * direction
-
-
-def _segment_distance(
-    first_start: np.ndarray,
-    first_end: np.ndarray,
-    second_start: np.ndarray,
-    second_end: np.ndarray,
-) -> float:
-    """計算兩個有限線段的最短距離。"""
-
-    first_direction = first_end - first_start
-    second_direction = second_end - second_start
-    offset = first_start - second_start
-    first_squared = float(np.dot(first_direction, first_direction))
-    second_squared = float(np.dot(second_direction, second_direction))
-    cross = float(np.dot(first_direction, second_direction))
-    first_offset = float(np.dot(first_direction, offset))
-    second_offset = float(np.dot(second_direction, offset))
-    denominator = first_squared * second_squared - cross * cross
-
-    if denominator <= 1e-12:
-        first_parameter = 0.0
-    else:
-        first_parameter = np.clip(
-            (cross * second_offset - first_offset * second_squared) / denominator,
-            0.0,
-            1.0,
-        )
-    second_parameter = np.clip(
-        (cross * first_parameter + second_offset) / second_squared,
-        0.0,
-        1.0,
-    )
-    first_parameter = np.clip(
-        (cross * second_parameter - first_offset) / first_squared,
-        0.0,
-        1.0,
-    )
-    first_point = first_start + first_parameter * first_direction
-    second_point = second_start + second_parameter * second_direction
-    return float(np.linalg.norm(first_point - second_point))
-
-
 def _project_outside_obstacles(
     nodes: np.ndarray,
     obstacles: tuple[PipeObstacleSpec, ...],
@@ -106,7 +83,7 @@ def _project_outside_obstacles(
         for index, node in enumerate(nodes):
             if index == pinned_index:
                 continue
-            closest = _closest_point_on_segment(node, start, end)
+            closest = closest_point_on_segment(node, start, end)
             radial = node - closest
             distance = float(np.linalg.norm(radial))
             if distance >= required_distance:
@@ -120,8 +97,6 @@ def _project_outside_obstacles(
             else:
                 radial /= distance
             nodes[index] = closest + radial * required_distance
-
-
 
 def _project_segment_samples(
     nodes: np.ndarray,
@@ -138,7 +113,7 @@ def _project_segment_samples(
         for index in range(len(nodes) - 1):
             for fraction in (0.25, 0.5, 0.75):
                 sample = (1.0 - fraction) * nodes[index] + fraction * nodes[index + 1]
-                closest = _closest_point_on_segment(sample, start, end)
+                closest = closest_point_on_segment(sample, start, end)
                 radial = sample - closest
                 distance = float(np.linalg.norm(radial))
                 if distance >= required_distance or distance <= 1e-9:
@@ -164,13 +139,17 @@ def _solve_hose_step(
 
     nodes = previous_nodes.copy()
     hose = spec.hose
-    pinned_index = hose.grasp_node_index if attached else None
-    if pinned_index is not None:
+    # 幾何階段固定一個內部錨點以維持管長；夾取時錨點才跟隨 TCP。
+    pinned_index = hose.grasp_node_index
+    anchor_position = (
+        tcp_position.copy() if attached else previous_nodes[pinned_index].copy()
+    )
+    if attached:
         distance_from_grasp = np.abs(np.arange(len(nodes)) - pinned_index)
         follow_weights = np.exp(-distance_from_grasp / hose.follow_decay_nodes)
         displacement = tcp_position - nodes[pinned_index]
         nodes += follow_weights[:, None] * displacement
-        nodes[pinned_index] = tcp_position
+    nodes[pinned_index] = anchor_position
 
     for _ in range(hose.constraint_iterations):
         if pinned_index is None:
@@ -212,11 +191,11 @@ def _solve_hose_step(
         else:
             free_mask = np.arange(len(nodes)) != pinned_index
             nodes[free_mask, 2] = np.maximum(nodes[free_mask, 2], minimum_z)
-            nodes[pinned_index] = tcp_position
+            nodes[pinned_index] = anchor_position
         _project_outside_obstacles(nodes, spec.obstacles, hose.radius, pinned_index)
 
     if pinned_index is not None:
-        nodes[pinned_index] = tcp_position
+        nodes[pinned_index] = anchor_position
     for _ in range(3):
         _project_segment_samples(nodes, spec.obstacles, hose.radius, pinned_index)
         free_mask = (
@@ -229,7 +208,7 @@ def _solve_hose_step(
             spec.table_top_z + hose.radius,
         )
         if pinned_index is not None:
-            nodes[pinned_index] = tcp_position
+            nodes[pinned_index] = anchor_position
     return nodes
 
 
@@ -241,34 +220,13 @@ def _hose_clearance(nodes: np.ndarray, spec: HoseMotionSpec) -> float:
         start = np.asarray(obstacle.start, dtype=np.float64)
         end = np.asarray(obstacle.end, dtype=np.float64)
         for index in range(len(nodes) - 1):
-            centerline_distance = _segment_distance(nodes[index], nodes[index + 1], start, end)
+            centerline_distance = segment_distance(
+                nodes[index],
+                nodes[index + 1],
+                start,
+                end,
+            )
             clearances.append(centerline_distance - spec.hose.radius - obstacle.radius)
-    return min(clearances, default=float("inf"))
-
-
-def _tool_clearance(
-    tcp_position: np.ndarray,
-    gripper_opening_m: float,
-    robot: RobotSpec,
-    spec: HoseMotionSpec,
-) -> float:
-    """以保守包覆球近似夾爪到固定管路的最短距離。"""
-
-    gripper = robot.gripper
-    tool_radius = max(
-        gripper.palm_size[2] / 2.0,
-        gripper_opening_m / 2.0 + gripper.finger_size[1],
-    )
-    clearances = []
-    for obstacle in spec.obstacles:
-        closest = _closest_point_on_segment(
-            tcp_position,
-            np.asarray(obstacle.start, dtype=np.float64),
-            np.asarray(obstacle.end, dtype=np.float64),
-        )
-        clearances.append(
-            float(np.linalg.norm(tcp_position - closest)) - tool_radius - obstacle.radius
-        )
     return min(clearances, default=float("inf"))
 
 
@@ -277,36 +235,64 @@ def _smoothstep(value: float) -> float:
 
 
 def _interpolated_states(
-    spec: HoseMotionSpec,
-) -> list[tuple[float, str, np.ndarray, float, bool]]:
-    """將關鍵幀轉為固定幀率且速度連續的 TCP 狀態。"""
+    keyframes: tuple[MotionKeyframeSpec, ...],
+    frame_rate_hz: int,
+) -> list[_MotionState]:
+    """以 smoothstep 與四元數 SLERP 產生固定幀率 TCP 狀態。"""
 
-    first = spec.keyframes[0]
+    first = keyframes[0]
+    first_rotation = pose_matrix((0.0, 0.0, 0.0), first.tcp_rpy_deg)[:3, :3]
     states = [
-        (
-            0.0,
-            first.phase,
-            np.asarray(first.tcp_position, dtype=np.float64),
-            first.gripper_opening_m,
-            first.attached,
+        _MotionState(
+            time_s=0.0,
+            phase=first.phase,
+            tcp_position=np.asarray(first.tcp_position, dtype=np.float64),
+            tcp_rpy_deg=np.asarray(first.tcp_rpy_deg, dtype=np.float64),
+            tcp_rotation=first_rotation,
+            gripper_opening_m=first.gripper_opening_m,
+            attached=first.attached,
         )
     ]
     time_s = 0.0
-    for previous, target in zip(spec.keyframes[:-1], spec.keyframes[1:], strict=True):
-        steps = max(1, int(round(target.duration_s * spec.frame_rate_hz)))
+    for previous, target in zip(keyframes[:-1], keyframes[1:], strict=True):
+        steps = max(1, int(round(target.duration_s * frame_rate_hz)))
+        previous_rotation = pose_matrix(
+            (0.0, 0.0, 0.0), previous.tcp_rpy_deg
+        )[:3, :3]
+        target_rotation = pose_matrix((0.0, 0.0, 0.0), target.tcp_rpy_deg)[:3, :3]
+        previous_quaternion = quaternion_from_matrix(previous_rotation)
+        target_quaternion = quaternion_from_matrix(target_rotation)
         for step in range(1, steps + 1):
             fraction = step / steps
             blend = _smoothstep(fraction)
             previous_position = np.asarray(previous.tcp_position, dtype=np.float64)
             target_position = np.asarray(target.tcp_position, dtype=np.float64)
             tcp_position = previous_position + blend * (target_position - previous_position)
+            tcp_rotation = matrix_from_quaternion(
+                quaternion_slerp(
+                    previous_quaternion,
+                    target_quaternion,
+                    blend,
+                )
+            )
+            tcp_rpy_deg = rpy_deg_from_matrix(tcp_rotation)
             opening = previous.gripper_opening_m + blend * (
                 target.gripper_opening_m - previous.gripper_opening_m
             )
             # 夾取在閉爪階段末端生效，釋放則在開爪階段末端生效。
             attached = previous.attached if step < steps else target.attached
             time_s += target.duration_s / steps
-            states.append((time_s, target.phase, tcp_position, opening, attached))
+            states.append(
+                _MotionState(
+                    time_s=time_s,
+                    phase=target.phase,
+                    tcp_position=tcp_position,
+                    tcp_rpy_deg=tcp_rpy_deg,
+                    tcp_rotation=tcp_rotation,
+                    gripper_opening_m=opening,
+                    attached=attached,
+                )
+            )
     return states
 
 
@@ -319,15 +305,19 @@ def simulate_hose_motion(spec: HoseMotionSpec, robot: RobotSpec) -> TrajectoryDa
     ):
         raise ValueError("動作 keyframe 的夾爪開口超過機械手規格")
 
+    waypoint_plan = plan_safe_waypoints(spec)
     initial_nodes = _resample_polyline(spec.hose.control_points, spec.hose.node_count)
     rest_lengths = np.linalg.norm(np.diff(initial_nodes, axis=0), axis=1)
     rest_total_length = float(rest_lengths.sum())
-    states = _interpolated_states(spec)
+    states = _interpolated_states(
+        waypoint_plan.keyframes,
+        spec.frame_rate_hz,
+    )
     previous_nodes = _solve_hose_step(
         initial_nodes,
         spec,
         rest_lengths,
-        states[0][2],
+        states[0].tcp_position,
         attached=False,
     )
     previous_angles = np.asarray(
@@ -336,57 +326,102 @@ def simulate_hose_motion(spec: HoseMotionSpec, robot: RobotSpec) -> TrajectoryDa
     )
     frames: list[TrajectoryFrame] = []
 
-    for time_s, phase, tcp_position, opening, attached in states:
-        ik_result = solve_position_ik(robot, tcp_position, previous_angles)
+    for state in states:
+        ik_result = solve_pose_ik(
+            robot,
+            state.tcp_position,
+            state.tcp_rotation,
+            previous_angles,
+        )
         previous_angles = ik_result.joint_angles_deg
         previous_nodes = _solve_hose_step(
             previous_nodes,
             spec,
             rest_lengths,
-            tcp_position,
-            attached,
+            state.tcp_position,
+            state.attached,
         )
         hose_clearance = _hose_clearance(previous_nodes, spec)
-        tool_clearance = _tool_clearance(tcp_position, opening, robot, spec)
-        minimum_clearance = min(hose_clearance, tool_clearance)
+        robot_clearance = evaluate_robot_clearance(
+            robot,
+            ik_result.joint_positions,
+            ik_result.tool_frame,
+            state.gripper_opening_m,
+            spec.obstacles,
+            spec.table_top_z,
+        )
         current_length = float(np.linalg.norm(np.diff(previous_nodes, axis=0), axis=1).sum())
         frames.append(
             TrajectoryFrame(
-                time_s=time_s,
-                phase=phase,
-                tcp_position=tcp_position.copy(),
-                gripper_opening_m=opening,
-                attached=attached,
+                time_s=state.time_s,
+                phase=state.phase,
+                tcp_position=state.tcp_position.copy(),
+                tcp_rpy_deg=state.tcp_rpy_deg.copy(),
+                tcp_rotation=state.tcp_rotation.copy(),
+                tool_frame=ik_result.tool_frame.copy(),
+                gripper_opening_m=state.gripper_opening_m,
+                attached=state.attached,
                 hose_nodes=previous_nodes.copy(),
                 robot_joint_positions=ik_result.joint_positions.copy(),
                 joint_angles_deg=ik_result.joint_angles_deg.copy(),
-                minimum_clearance_m=minimum_clearance,
+                minimum_clearance_m=robot_clearance.minimum_clearance_m,
                 hose_clearance_m=hose_clearance,
-                tool_clearance_m=tool_clearance,
-                collision=minimum_clearance < -spec.collision_tolerance_m,
+                link_clearance_m=robot_clearance.link_clearance_m,
+                gripper_clearance_m=robot_clearance.gripper_clearance_m,
+                closest_collision_pair=robot_clearance.closest_pair,
+                collision=(
+                    robot_clearance.minimum_clearance_m
+                    < -spec.collision_tolerance_m
+                ),
                 ik_position_error_m=ik_result.position_error_m,
+                ik_orientation_error_deg=ik_result.orientation_error_deg,
                 hose_length_ratio=current_length / rest_total_length,
             )
         )
 
     clearances = np.asarray([frame.minimum_clearance_m for frame in frames])
     ik_errors = np.asarray([frame.ik_position_error_m for frame in frames])
+    orientation_errors = np.asarray(
+        [frame.ik_orientation_error_deg for frame in frames]
+    )
     length_ratios = np.asarray([frame.hose_length_ratio for frame in frames])
+    hose_clearances = np.asarray([frame.hose_clearance_m for frame in frames])
     metrics: dict[str, float | int] = {
         "frame_count": len(frames),
         "duration_s": frames[-1].time_s,
         "minimum_clearance_m": float(clearances.min()),
-        "minimum_hose_clearance_m": float(min(frame.hose_clearance_m for frame in frames)),
-        "minimum_tool_clearance_m": float(min(frame.tool_clearance_m for frame in frames)),
+        "minimum_robot_clearance_m": float(clearances.min()),
+        "minimum_link_clearance_m": float(
+            min(frame.link_clearance_m for frame in frames)
+        ),
+        "minimum_gripper_clearance_m": float(
+            min(frame.gripper_clearance_m for frame in frames)
+        ),
+        "minimum_hose_clearance_m": float(hose_clearances.min()),
         "collision_frame_count": int(
             np.count_nonzero(clearances < -spec.collision_tolerance_m)
         ),
         "unsafe_clearance_frame_count": int(
             np.count_nonzero(clearances < spec.safe_clearance_m)
         ),
+        "hose_contact_frame_count": int(np.count_nonzero(hose_clearances <= 0.001)),
+        "hose_penetration_frame_count": int(
+            np.count_nonzero(hose_clearances < -spec.collision_tolerance_m)
+        ),
         "maximum_ik_error_m": float(ik_errors.max()),
-        "failed_ik_frame_count": int(np.count_nonzero(ik_errors > 0.002)),
+        "maximum_ik_orientation_error_deg": float(orientation_errors.max()),
+        "failed_ik_frame_count": int(
+            np.count_nonzero((ik_errors > 0.002) | (orientation_errors > 1.0))
+        ),
         "maximum_hose_length_error_ratio": float(np.max(np.abs(length_ratios - 1.0))),
         "attached_frame_count": int(sum(frame.attached for frame in frames)),
+        "planned_keyframe_count": len(waypoint_plan.keyframes),
+        "inserted_waypoint_count": waypoint_plan.inserted_waypoint_count,
+        "unresolved_path_segment_count": waypoint_plan.unresolved_segment_count,
     }
-    return TrajectoryData(spec=spec, frames=tuple(frames), metrics=metrics)
+    return TrajectoryData(
+        spec=spec,
+        planned_keyframes=waypoint_plan.keyframes,
+        frames=tuple(frames),
+        metrics=metrics,
+    )

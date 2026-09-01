@@ -1,5 +1,6 @@
 """軟管時間序列、IK、碰撞與匯出格式測試。"""
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -41,10 +42,15 @@ def test_motion_reports_ik_collision_and_constraint_quality(
     metrics = motion_trajectory.metrics
     assert metrics["failed_ik_frame_count"] == 0
     assert metrics["maximum_ik_error_m"] <= 0.002
+    assert metrics["maximum_ik_orientation_error_deg"] <= 1.0
     assert metrics["collision_frame_count"] == 0
-    assert metrics["minimum_tool_clearance_m"] > 0.03
+    assert metrics["minimum_robot_clearance_m"] >= 0.005
+    assert metrics["unsafe_clearance_frame_count"] == 0
+    assert metrics["inserted_waypoint_count"] == 1
+    assert metrics["unresolved_path_segment_count"] == 0
+    assert metrics["hose_contact_frame_count"] > 0
+    assert metrics["hose_penetration_frame_count"] == 0
     assert metrics["maximum_hose_length_error_ratio"] < 0.01
-    assert metrics["unsafe_clearance_frame_count"] > 0
 
 
 def test_trajectory_export_is_pickle_free_and_shape_stable(
@@ -56,11 +62,30 @@ def test_trajectory_export_is_pickle_free_and_shape_stable(
         assert str(data["schema_version"].item()) == MOTION_SCHEMA_VERSION
         assert data["hose_nodes"].shape == (116, 49, 3)
         assert data["joint_angles_deg"].shape == (116, 6)
+        assert data["tcp_rotation"].shape == (116, 3, 3)
+        assert data["tool_frame"].shape == (116, 4, 4)
+        assert data["ik_orientation_error_deg"].shape == (116,)
         assert data["phase"].dtype.kind == "U"
 
-    metadata = paths["metrics"].read_text(encoding="utf-8")
-    assert '"physics_engine": null' in metadata
-    assert '"collision_frame_count": 0' in metadata
+    metadata = json.loads(paths["metrics"].read_text(encoding="utf-8"))
+    assert metadata["physics_engine"] is None
+    assert metadata["solver"] == "kinematic_pose_and_geometric_constraints"
+    assert metadata["metrics"]["collision_frame_count"] == 0
+    assert len(metadata["planned_keyframes"]) == 12
+    assert sum(item["generated"] for item in metadata["planned_keyframes"]) == 1
+
+
+def test_planner_inserts_visible_generated_waypoint(
+    motion_trajectory: TrajectoryData,
+) -> None:
+    generated = [
+        keyframe
+        for keyframe in motion_trajectory.planned_keyframes
+        if keyframe.generated
+    ]
+    assert len(generated) == 1
+    assert generated[0].phase == "自動安全繞行"
+    assert any(frame.phase == "自動安全繞行" for frame in motion_trajectory.frames)
 
 
 def test_motion_figure_contains_all_animation_frames(

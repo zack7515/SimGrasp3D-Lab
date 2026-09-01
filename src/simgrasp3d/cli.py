@@ -136,9 +136,12 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "連續動作："
             f"{motion_metrics['frame_count']} 幀 / {motion_metrics['duration_s']:.1f} s｜"
-            f"最大 IK 誤差={motion_metrics['maximum_ik_error_m'] * 1000.0:.2f} mm｜"
-            f"碰撞幀={motion_metrics['collision_frame_count']}｜"
-            f"安全警示幀={motion_metrics['unsafe_clearance_frame_count']}"
+            f"IK={motion_metrics['maximum_ik_error_m'] * 1000.0:.2f} mm / "
+            f"{motion_metrics['maximum_ik_orientation_error_deg']:.2f}°｜"
+            f"自動 waypoint={motion_metrics['inserted_waypoint_count']}｜"
+            f"機器人警示/碰撞={motion_metrics['unsafe_clearance_frame_count']}/"
+            f"{motion_metrics['collision_frame_count']}｜"
+            f"軟管接觸={motion_metrics['hose_contact_frame_count']}"
         )
         print(f"軟管動畫：{motion_path}")
         print(f"逐幀軌跡：{motion_paths['trajectory'].resolve()}")

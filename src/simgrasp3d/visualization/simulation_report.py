@@ -527,20 +527,30 @@ def _motion_metric_table(trajectory: TrajectoryData) -> str:
     labels = {
         "frame_count": "動畫幀數",
         "duration_s": "動作總時間",
-        "minimum_clearance_m": "全體最小距離",
-        "minimum_hose_clearance_m": "軟管最小距離",
-        "minimum_tool_clearance_m": "夾爪最小距離",
-        "collision_frame_count": "碰撞幀數",
-        "unsafe_clearance_frame_count": "低於安全餘量幀數",
+        "minimum_clearance_m": "機器人最小距離（相容欄位）",
+        "minimum_robot_clearance_m": "機器人最小環境距離",
+        "minimum_link_clearance_m": "連桿最小環境距離",
+        "minimum_gripper_clearance_m": "夾爪最小環境距離",
+        "minimum_hose_clearance_m": "軟管最小管路距離",
+        "collision_frame_count": "機器人碰撞幀數",
+        "unsafe_clearance_frame_count": "機器人安全警示幀數",
+        "hose_contact_frame_count": "軟管接觸幀數",
+        "hose_penetration_frame_count": "軟管穿透幀數",
         "maximum_ik_error_m": "最大 IK 位置誤差",
+        "maximum_ik_orientation_error_deg": "最大 IK 姿態誤差",
         "failed_ik_frame_count": "IK 失敗幀數",
         "maximum_hose_length_error_ratio": "最大軟管長度誤差",
         "attached_frame_count": "夾持狀態幀數",
+        "planned_keyframe_count": "規劃後關鍵幀數",
+        "inserted_waypoint_count": "自動插入 waypoint 數",
+        "unresolved_path_segment_count": "未解決路徑線段數",
     }
     rows = []
     for key, value in trajectory.metrics.items():
         if key.endswith("_m"):
             display = f"{float(value) * 1000.0:.3f} mm"
+        elif key.endswith("_deg"):
+            display = f"{float(value):.3f}°"
         elif key.endswith("_ratio"):
             display = f"{float(value) * 100.0:.3f}%"
         elif key == "duration_s":
@@ -578,7 +588,7 @@ def _motion_section(
         config={"displaylogo": False, "responsive": True, "scrollZoom": True},
     )
     phases: list[str] = []
-    for keyframe in trajectory.spec.keyframes:
+    for keyframe in trajectory.planned_keyframes:
         if not phases or phases[-1] != keyframe.phase:
             phases.append(keyframe.phase)
     phase_rail = "".join(
@@ -595,17 +605,17 @@ def _motion_section(
         )
         for label, value, class_name in (
             ("DURATION", f"{float(metrics['duration_s']):.1f} s", "accent"),
-            ("FRAMES", f"{int(metrics['frame_count'])}", ""),
-            ("MAX IK ERROR", f"{float(metrics['maximum_ik_error_m']) * 1000.0:.2f} mm", ""),
-            ("TOOL CLEARANCE", f"{float(metrics['minimum_tool_clearance_m']) * 1000.0:.1f} mm", "accent"),
-            ("CLEARANCE WARN", f"{int(metrics['unsafe_clearance_frame_count'])}", "warning"),
-            ("COLLISION FRAMES", f"{int(metrics['collision_frame_count'])}", "accent"),
+            ("AUTO WAYPOINT", f"{int(metrics['inserted_waypoint_count'])}", "warning"),
+            ("IK POSITION", f"{float(metrics['maximum_ik_error_m']) * 1000.0:.2f} mm", ""),
+            ("IK ORIENTATION", f"{float(metrics['maximum_ik_orientation_error_deg']):.2f}°", ""),
+            ("ROBOT CLEARANCE", f"{float(metrics['minimum_robot_clearance_m']) * 1000.0:.1f} mm", "accent"),
+            ("ROBOT WARN / HIT", f"{int(metrics['unsafe_clearance_frame_count'])} / {int(metrics['collision_frame_count'])}", "accent"),
         )
     )
     return f"""
     <section class="pane motion-section" aria-label="軟管夾取連續動作動畫">
       <header class="pane-header">
-        <div class="pane-title"><span class="pane-code">C</span><div><h2>軟管抽取與搬運時間序列</h2><p>位置型 IK、固定節長軟管、管路距離與夾取附著狀態</p></div></div>
+        <div class="pane-title"><span class="pane-code">C</span><div><h2>軟管抽取與搬運時間序列</h2><p>六自由度 IK、機器人尺寸碰撞、軟管接觸與自動 waypoint</p></div></div>
         <span class="pane-badge">KINEMATIC LEARNING</span>
       </header>
       <div class="phase-rail" aria-label="動作階段">{phase_rail}</div>
@@ -617,7 +627,7 @@ def _motion_section(
           <tbody>{_motion_metric_table(trajectory)}</tbody>
         </table>
       </div>
-      <div class="motion-note">橘色表示距離低於 {trajectory.spec.safe_clearance_m * 1000.0:.1f} mm 的教學警示；穿透超過 {trajectory.spec.collision_tolerance_m * 1000.0:.2f} mm 才以紅色計為碰撞。此階段使用幾何約束近似軟管形變，不計算材料剛性、摩擦、接觸力或慣性。</div>
+      <div class="motion-note">TCP 橘／紅色代表機器人低於 {trajectory.spec.safe_clearance_m * 1000.0:.1f} mm 或穿透；軟管節點橘色則表示與管路進入 1 mm 接觸帶，兩者分開統計。規劃器插入的 waypoint 以橘色路徑節點顯示。此階段仍不計算材料剛性、摩擦、接觸力或慣性。</div>
     </section>
     """
 

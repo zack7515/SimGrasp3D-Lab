@@ -10,7 +10,7 @@ import numpy as np
 from simgrasp3d.models.motion import TrajectoryData
 
 
-MOTION_SCHEMA_VERSION = "1.0"
+MOTION_SCHEMA_VERSION = "2.0"
 
 
 def write_trajectory_npz(path: str | Path, trajectory: TrajectoryData) -> Path:
@@ -26,6 +26,9 @@ def write_trajectory_npz(path: str | Path, trajectory: TrajectoryData) -> Path:
         time_s=np.asarray([frame.time_s for frame in frames], dtype=np.float64),
         phase=np.asarray([frame.phase for frame in frames], dtype=np.str_),
         tcp_position=np.stack([frame.tcp_position for frame in frames]),
+        tcp_rpy_deg=np.stack([frame.tcp_rpy_deg for frame in frames]),
+        tcp_rotation=np.stack([frame.tcp_rotation for frame in frames]),
+        tool_frame=np.stack([frame.tool_frame for frame in frames]),
         gripper_opening_m=np.asarray(
             [frame.gripper_opening_m for frame in frames], dtype=np.float64
         ),
@@ -41,12 +44,21 @@ def write_trajectory_npz(path: str | Path, trajectory: TrajectoryData) -> Path:
         hose_clearance_m=np.asarray(
             [frame.hose_clearance_m for frame in frames], dtype=np.float64
         ),
-        tool_clearance_m=np.asarray(
-            [frame.tool_clearance_m for frame in frames], dtype=np.float64
+        link_clearance_m=np.asarray(
+            [frame.link_clearance_m for frame in frames], dtype=np.float64
+        ),
+        gripper_clearance_m=np.asarray(
+            [frame.gripper_clearance_m for frame in frames], dtype=np.float64
+        ),
+        closest_collision_pair=np.asarray(
+            [frame.closest_collision_pair for frame in frames], dtype=np.str_
         ),
         collision=np.asarray([frame.collision for frame in frames], dtype=np.bool_),
         ik_position_error_m=np.asarray(
             [frame.ik_position_error_m for frame in frames], dtype=np.float64
+        ),
+        ik_orientation_error_deg=np.asarray(
+            [frame.ik_orientation_error_deg for frame in frames], dtype=np.float64
         ),
         hose_length_ratio=np.asarray(
             [frame.hose_length_ratio for frame in frames], dtype=np.float64
@@ -67,10 +79,30 @@ def export_trajectory(output_dir: str | Path, trajectory: TrajectoryData) -> dic
         "scenario_name": trajectory.spec.name,
         "length_unit": "meter",
         "time_unit": "second",
-        "solver": "kinematic_position_constraints",
+        "solver": "kinematic_pose_and_geometric_constraints",
         "physics_engine": None,
         "safe_clearance_m": trajectory.spec.safe_clearance_m,
         "collision_tolerance_m": trajectory.spec.collision_tolerance_m,
+        "waypoint_planner": {
+            "enabled": trajectory.spec.waypoint_planner.enabled,
+            "tool_envelope_radius_m": (
+                trajectory.spec.waypoint_planner.tool_envelope_radius_m
+            ),
+            "detour_step_m": trajectory.spec.waypoint_planner.detour_step_m,
+            "maximum_detour_m": trajectory.spec.waypoint_planner.maximum_detour_m,
+        },
+        "planned_keyframes": [
+            {
+                "phase": keyframe.phase,
+                "duration_s": keyframe.duration_s,
+                "tcp_position": keyframe.tcp_position,
+                "tcp_rpy_deg": keyframe.tcp_rpy_deg,
+                "gripper_opening_m": keyframe.gripper_opening_m,
+                "attached": keyframe.attached,
+                "generated": keyframe.generated,
+            }
+            for keyframe in trajectory.planned_keyframes
+        ],
         "metrics": trajectory.metrics,
     }
     metadata_path.write_text(

@@ -140,6 +140,7 @@ class GripperSpec:
     palm_size: Vector3
     finger_size: Vector3
     opening: float
+    tcp_offset: Vector3
     color: Color
 
     @classmethod
@@ -154,6 +155,13 @@ class GripperSpec:
             palm_size=palm_size,
             finger_size=finger_size,
             opening=opening,
+            tcp_offset=_vector3(
+                data.get(
+                    "tcp_offset",
+                    [palm_size[0] + finger_size[0], 0.0, 0.0],
+                ),
+                "gripper.tcp_offset",
+            ),
             color=_color(data.get("color", [0.8, 0.8, 0.8])),
         )
 

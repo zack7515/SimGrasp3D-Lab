@@ -108,8 +108,10 @@ class MotionKeyframeSpec:
     phase: str
     duration_s: float
     tcp_position: Vector3
+    tcp_rpy_deg: Vector3
     gripper_opening_m: float
     attached: bool
+    generated: bool = False
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> MotionKeyframeSpec:
@@ -123,8 +125,39 @@ class MotionKeyframeSpec:
             phase=str(data["phase"]),
             duration_s=duration_s,
             tcp_position=_vector3(data["tcp_position"], "keyframe.tcp_position"),
+            tcp_rpy_deg=_vector3(
+                data.get("tcp_rpy_deg", [0.0, 0.0, 0.0]),
+                "keyframe.tcp_rpy_deg",
+            ),
             gripper_opening_m=gripper_opening_m,
             attached=bool(data.get("attached", False)),
+            generated=bool(data.get("generated", False)),
+        )
+
+
+@dataclass(frozen=True)
+class WaypointPlannerSpec:
+    """以保守工具包覆體為直線路徑加入安全繞行點的設定。"""
+
+    enabled: bool
+    tool_envelope_radius_m: float
+    detour_step_m: float
+    maximum_detour_m: float
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> WaypointPlannerSpec:
+        tool_envelope_radius_m = float(data.get("tool_envelope_radius_m", 0.075))
+        detour_step_m = float(data.get("detour_step_m", 0.05))
+        maximum_detour_m = float(data.get("maximum_detour_m", 0.35))
+        if min(tool_envelope_radius_m, detour_step_m, maximum_detour_m) <= 0.0:
+            raise ValueError("waypoint_planner 的半徑、步距與最大繞行量必須大於 0")
+        if maximum_detour_m < detour_step_m:
+            raise ValueError("waypoint_planner.maximum_detour_m 不可小於 detour_step_m")
+        return cls(
+            enabled=bool(data.get("enabled", True)),
+            tool_envelope_radius_m=tool_envelope_radius_m,
+            detour_step_m=detour_step_m,
+            maximum_detour_m=maximum_detour_m,
         )
 
 
@@ -142,6 +175,7 @@ class HoseMotionSpec:
     hose: HoseSpec
     obstacles: tuple[PipeObstacleSpec, ...]
     keyframes: tuple[MotionKeyframeSpec, ...]
+    waypoint_planner: WaypointPlannerSpec
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> HoseMotionSpec:
@@ -174,6 +208,9 @@ class HoseMotionSpec:
             hose=HoseSpec.from_dict(data["hose"]),
             obstacles=obstacles,
             keyframes=keyframes,
+            waypoint_planner=WaypointPlannerSpec.from_dict(
+                data.get("waypoint_planner", {})
+            ),
         )
 
 
@@ -184,6 +221,9 @@ class TrajectoryFrame:
     time_s: float
     phase: str
     tcp_position: np.ndarray
+    tcp_rpy_deg: np.ndarray
+    tcp_rotation: np.ndarray
+    tool_frame: np.ndarray
     gripper_opening_m: float
     attached: bool
     hose_nodes: np.ndarray
@@ -191,9 +231,12 @@ class TrajectoryFrame:
     joint_angles_deg: np.ndarray
     minimum_clearance_m: float
     hose_clearance_m: float
-    tool_clearance_m: float
+    link_clearance_m: float
+    gripper_clearance_m: float
+    closest_collision_pair: str
     collision: bool
     ik_position_error_m: float
+    ik_orientation_error_deg: float
     hose_length_ratio: float
 
 
@@ -202,5 +245,6 @@ class TrajectoryData:
     """軟管連續動作的規格、逐幀結果與摘要指標。"""
 
     spec: HoseMotionSpec
+    planned_keyframes: tuple[MotionKeyframeSpec, ...]
     frames: tuple[TrajectoryFrame, ...]
     metrics: dict[str, float | int]

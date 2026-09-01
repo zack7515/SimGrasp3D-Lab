@@ -2,7 +2,14 @@
 
 import numpy as np
 
-from simgrasp3d.geometry.transforms import pose_matrix, rotation_matrix, transform_points
+from simgrasp3d.geometry.transforms import (
+    matrix_from_quaternion,
+    pose_matrix,
+    quaternion_from_matrix,
+    quaternion_slerp,
+    rotation_matrix,
+    transform_points,
+)
 
 
 def test_translation_is_applied_to_points() -> None:
@@ -20,3 +27,29 @@ def test_pose_rotation_uses_roll_pitch_yaw_order() -> None:
     transform = pose_matrix((0.0, 0.0, 0.0), (0.0, 0.0, 90.0))
     np.testing.assert_allclose(transform[:3, :3], rotation_matrix("z", 90.0)[:3, :3])
 
+
+def test_quaternion_round_trip_preserves_rotation() -> None:
+    rotation = pose_matrix((0.0, 0.0, 0.0), (31.0, -47.0, 123.0))[:3, :3]
+    quaternion = quaternion_from_matrix(rotation)
+    np.testing.assert_allclose(
+        matrix_from_quaternion(quaternion),
+        rotation,
+        atol=1e-12,
+    )
+
+
+def test_quaternion_slerp_reaches_midpoint_without_mutating_inputs() -> None:
+    first = quaternion_from_matrix(np.eye(3))
+    second = quaternion_from_matrix(rotation_matrix("z", 90.0)[:3, :3])
+    first_before = first.copy()
+    second_before = second.copy()
+
+    midpoint = matrix_from_quaternion(quaternion_slerp(first, second, 0.5))
+
+    np.testing.assert_allclose(
+        midpoint,
+        rotation_matrix("z", 45.0)[:3, :3],
+        atol=1e-12,
+    )
+    np.testing.assert_array_equal(first, first_before)
+    np.testing.assert_array_equal(second, second_before)

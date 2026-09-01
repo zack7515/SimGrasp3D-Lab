@@ -25,8 +25,14 @@ def test_robot_has_one_more_joint_position_than_links() -> None:
     assert scene.robot_state.joint_positions.shape == (len(scene.spec.robot.links) + 1, 3)
     np.testing.assert_allclose(
         scene.robot_state.joint_positions[-1],
-        scene.robot_state.tool_frame[:3, 3],
+        scene.robot_state.joint_frames["flange"][:3, 3],
     )
+    tcp_offset = np.linalg.norm(scene.spec.robot.gripper.tcp_offset)
+    flange_to_tcp = np.linalg.norm(
+        scene.robot_state.tool_frame[:3, 3]
+        - scene.robot_state.joint_frames["flange"][:3, 3]
+    )
+    assert abs(flange_to_tcp - tcp_offset) < 1e-12
 
 
 def test_objects_are_above_table_top() -> None:
@@ -43,4 +49,3 @@ def test_point_cloud_export_contains_ply_header(tmp_path: Path) -> None:
     paths = export_scene_point_clouds(tmp_path, scene.point_clouds[:2])
     assert len(paths) == 3
     assert paths[0].read_text(encoding="ascii").startswith("ply\nformat ascii 1.0")
-

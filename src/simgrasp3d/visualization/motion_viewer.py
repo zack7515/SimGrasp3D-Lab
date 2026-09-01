@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 
 from simgrasp3d.models.motion import PipeObstacleSpec, TrajectoryData, TrajectoryFrame
 from simgrasp3d.models.specs import RobotSpec, TableSpec
+from simgrasp3d.robot.collision import build_robot_capsules
 
 
 def _rgb(color: tuple[float, float, float]) -> str:
@@ -27,6 +28,7 @@ def _status_color(frame: TrajectoryFrame, safe_clearance_m: float) -> str:
 def _dynamic_traces(
     frame: TrajectoryFrame,
     trajectory: TrajectoryData,
+    robot: RobotSpec,
 ) -> list[go.Scatter3d]:
     """建立單幀的機械臂、軟管、TCP 與夾爪代理幾何。"""
 
@@ -34,17 +36,27 @@ def _dynamic_traces(
     joints = frame.robot_joint_positions
     nodes = frame.hose_nodes
     tcp = frame.tcp_position
-    half_opening = frame.gripper_opening_m / 2.0
-    gripper_x = [tcp[0], tcp[0], None, tcp[0], tcp[0]]
-    gripper_y = [
-        tcp[1] - half_opening,
-        tcp[1] + half_opening,
-        None,
-        tcp[1] - half_opening,
-        tcp[1] + half_opening,
+    gripper_parts = [
+        part
+        for part in build_robot_capsules(
+            robot,
+            frame.robot_joint_positions,
+            frame.tool_frame,
+            frame.gripper_opening_m,
+        )
+        if part.category == "gripper"
     ]
-    gripper_z = [tcp[2], tcp[2], None, tcp[2] + 0.025, tcp[2] + 0.025]
+    gripper_x: list[float | None] = []
+    gripper_y: list[float | None] = []
+    gripper_z: list[float | None] = []
+    for part in gripper_parts:
+        gripper_x.extend((float(part.start[0]), float(part.end[0]), None))
+        gripper_y.extend((float(part.start[1]), float(part.end[1]), None))
+        gripper_z.extend((float(part.start[2]), float(part.end[2]), None))
     attached_label = "已附著" if frame.attached else "未附著"
+    hose_status_color = "#e89a36" if frame.hose_clearance_m <= 0.001 else _rgb(
+        trajectory.spec.hose.color
+    )
     return [
         go.Scatter3d(
             x=joints[:, 0],
@@ -63,7 +75,7 @@ def _dynamic_traces(
             mode="lines+markers",
             name=trajectory.spec.hose.name,
             line={"color": _rgb(trajectory.spec.hose.color), "width": 9},
-            marker={"size": 2.5, "color": status_color},
+            marker={"size": 2.5, "color": hose_status_color},
             hovertemplate="軟管節點<br>x=%{x:.3f}<br>y=%{y:.3f}<br>z=%{z:.3f} m<extra></extra>",
         ),
         go.Scatter3d(
@@ -77,8 +89,10 @@ def _dynamic_traces(
             textposition="top center",
             hovertemplate=(
                 f"<b>{frame.phase}</b><br>t={frame.time_s:.2f} s<br>"
-                f"狀態：{attached_label}<br>最小距離={frame.minimum_clearance_m * 1000.0:.2f} mm<br>"
-                f"IK 誤差={frame.ik_position_error_m * 1000.0:.2f} mm<extra></extra>"
+                f"狀態：{attached_label}<br>機器人距離={frame.minimum_clearance_m * 1000.0:.2f} mm<br>"
+                f"最近：{frame.closest_collision_pair}<br>"
+                f"IK 位置={frame.ik_position_error_m * 1000.0:.2f} mm<br>"
+                f"IK 姿態={frame.ik_orientation_error_deg:.2f}°<extra></extra>"
             ),
         ),
         go.Scatter3d(
@@ -166,14 +180,14 @@ def build_motion_figure(
     """建立含播放鍵、逐幀滑桿與安全狀態的 3D 動畫。"""
 
     first = trajectory.frames[0]
-    figure = go.Figure(data=_dynamic_traces(first, trajectory))
+    figure = go.Figure(data=_dynamic_traces(first, trajectory, robot))
     figure.add_trace(_table_trace(table))
 
     for obstacle in trajectory.spec.obstacles:
         figure.add_trace(_cylinder_trace(obstacle))
 
     keyframe_positions = np.asarray(
-        [keyframe.tcp_position for keyframe in trajectory.spec.keyframes],
+        [keyframe.tcp_position for keyframe in trajectory.planned_keyframes],
         dtype=np.float64,
     )
     figure.add_trace(
@@ -184,7 +198,13 @@ def build_motion_figure(
             mode="lines+markers",
             name="TCP 規劃路徑",
             line={"color": "#718592", "width": 4, "dash": "dash"},
-            marker={"size": 3, "color": "#718592"},
+            marker={
+                "size": 4,
+                "color": [
+                    "#e89a36" if keyframe.generated else "#718592"
+                    for keyframe in trajectory.planned_keyframes
+                ],
+            },
             hovertemplate="規劃節點<br>x=%{x:.3f}<br>y=%{y:.3f}<br>z=%{z:.3f} m<extra></extra>",
         )
     )
@@ -207,7 +227,7 @@ def build_motion_figure(
     figure.frames = tuple(
         go.Frame(
             name=f"{index:04d}",
-            data=_dynamic_traces(frame, trajectory),
+            data=_dynamic_traces(frame, trajectory, robot),
             traces=[0, 1, 2, 3],
         )
         for index, frame in enumerate(trajectory.frames)
@@ -298,8 +318,9 @@ def build_motion_figure(
             {
                 "text": (
                     f"IK max {metrics['maximum_ik_error_m'] * 1000.0:.2f} mm ｜ "
-                    f"軟管長度 max Δ {metrics['maximum_hose_length_error_ratio'] * 100.0:.2f}% ｜ "
-                    f"碰撞幀 {metrics['collision_frame_count']}"
+                    f"姿態 {metrics['maximum_ik_orientation_error_deg']:.2f}° ｜ "
+                    f"AUTO WP {metrics['inserted_waypoint_count']} ｜ "
+                    f"機器人警示 {metrics['unsafe_clearance_frame_count']}"
                 ),
                 "xref": "paper",
                 "yref": "paper",

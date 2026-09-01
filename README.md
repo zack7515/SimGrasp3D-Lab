@@ -4,15 +4,17 @@
 
 作者：`zack7515`
 
-> 目前階段：幾何、點雲、RGB-D 感測與軟管運動學教學原型。已加入位置型 IK、關節限制、固定管路距離與連續動作；尚未加入接觸物理、摩擦、材料參數、末端姿態 IK 或自動抓取策略，因此輸出不代表實機抓取結果。
+> 目前階段：幾何、點雲、RGB-D 感測與軟管運動學教學原型。已加入六自由度 IK、flange/TCP 工具標定、機器人尺寸碰撞及自動 waypoint；尚未加入接觸力、摩擦、材料參數、連續 swept-volume 或自動抓取策略，因此輸出不代表實機抓取結果。
 
 ## 目前可以做什麼
 
 - 由 JSON 定義桌面、物件、六軸機械手、夾爪與虛擬 RGB-D 相機。
 - 依公尺尺寸產生盒體、圓柱、球體及機械手表面點雲。
 - 計算序列式機械手正向運動學與 TCP 世界座標。
-- 以阻尼最小平方位置型 IK 產生連續關節骨架，並驗證工作空間、關節限制與 TCP 誤差。
-- 模擬軟管夾取、抬升、繞管、搬運、放置與退回，逐幀檢查夾爪／軟管距離及約束品質。
+- 以阻尼最小平方六自由度 IK 產生連續關節骨架，驗證 TCP 位置、姿態與關節限制。
+- 分離 flange 與指尖 TCP offset，以實際連桿、關節、手掌與手指尺寸檢查桌面／管路距離。
+- 使用保守工具包覆體檢查直線路徑，遇到風險時自動加入安全 waypoint。
+- 模擬軟管夾取、抬升、繞管、搬運、放置與退回，分開統計機器人安全與軟管接觸。
 - 在瀏覽器中旋轉、縮放及切換物件、機械手、座標軸與相機視錐。
 - 將各實體與完整場景匯出為 ASCII PLY，供 Open3D、CloudCompare 等工具使用。
 - 以 pinhole 相機和 z-buffer 產生可見 RGB、深度、instance mask 與彩色點雲。
@@ -118,11 +120,14 @@ simgrasp3d-lab/
 | `src/simgrasp3d/models/specs.py` | 將 JSON 轉成具型別的設定物件，並檢查尺寸、顏色、單位及必要欄位 | 新增場景欄位或物件種類時 |
 | `src/simgrasp3d/models/motion.py` | 定義軟管情境、關鍵幀、`TrajectoryFrame` 與 `TrajectoryData` | 擴充運動時間序列欄位時 |
 | `src/simgrasp3d/geometry/transforms.py` | 建立平移、旋轉、姿態矩陣，轉換點座標並對齊圓柱方向 | 擴充座標系或姿態運算時 |
+| `src/simgrasp3d/geometry/collision.py` | 計算線段、膠囊體與水平桌面的解析式有號距離 | 擴充碰撞幾何時 |
 | `src/simgrasp3d/geometry/sampling.py` | 對盒體、圓柱與球體表面取樣，提供點雲容器與邊界計算 | 新增幾何形狀或取樣方法時 |
-| `src/simgrasp3d/robot/kinematics.py` | 計算 FK、位置型 IK、各關節 frame、TCP 與機械手點雲 | 修改機構模型、關節限制或 IK 時 |
+| `src/simgrasp3d/robot/kinematics.py` | 計算 FK、位置／六自由度 IK、flange、TCP 與機械手點雲 | 修改機構模型、工具標定或 IK 時 |
+| `src/simgrasp3d/robot/collision.py` | 以膠囊體包覆連桿、關節、手掌與手指，計算環境距離 | 修改機器人碰撞模型時 |
 | `src/simgrasp3d/scene/builder.py` | 載入設定、建立所有實體、相機座標與視錐，組成完整場景 | 加入感測、燈光或場景元素時 |
 | `src/simgrasp3d/sensors/rgbd.py` | 定義 `RGBDFrame`，執行投影、z-buffer、回投影及深度／外參誤差模擬 | 修改相機模型或真實資料轉接格式時 |
 | `src/simgrasp3d/simulation/hose_motion.py` | 產生軟管固定節長、附著、重力近似、障礙投影與逐幀距離 | 換路徑規劃器或物理求解器時 |
+| `src/simgrasp3d/simulation/waypoint_planner.py` | 找出不安全 TCP 直線並搜尋單一繞行點 | 擴充多 waypoint 或採樣式規劃時 |
 | `src/simgrasp3d/visualization/plotly_viewer.py` | 建立互動式圖層、座標軸、hover 資訊與 HTML | 改善視覺呈現或除錯資訊時 |
 | `src/simgrasp3d/visualization/rgbd_viewer.py` | 比較理想深度、觀測深度、絕對誤差與 RGB | 分析感測品質時 |
 | `src/simgrasp3d/visualization/motion_viewer.py` | 建立播放、暫停、時間軸、安全狀態與動作階段 3D 動畫 | 調整連續動作教學畫面時 |
@@ -155,8 +160,9 @@ flowchart LR
     I --> L[誤差指標與比較 HTML]
     K --> L
     B --> N[軟管與動作關鍵幀]
-    N --> O[位置型 IK 與幾何約束]
-    O --> P[TrajectoryFrame 時間序列]
+    N --> O[自動 waypoint 與六自由度 IK]
+    O --> R[機器人尺寸碰撞與軟管接觸]
+    R --> P[TrajectoryFrame 時間序列]
     P --> Q[可播放 3D 動畫與 NPZ]
     E --> M[單頁驗證報告]
     L --> M
@@ -181,7 +187,7 @@ flowchart LR
 
 光學相機採 OpenCV 慣例：x 向右、y 向下、z 向前。`observation` 的 `camera_to_world` 刻意保存系統認知的名義外參；實際擾動後的外參另存於 `metrics.json`，因此其回投影點雲能呈現校正誤差。
 
-### Motion trajectory v1.0
+### Motion trajectory v2.0
 
 `outputs/motion/trajectory.npz` 是目前幾何求解器與未來物理引擎共用的逐幀資料契約：
 
@@ -190,16 +196,23 @@ flowchart LR
 | `time_s` | `float64 [T]` | 每幀模擬時間 |
 | `phase` | Unicode `[T]` | 待機、接近、夾取、抬升、避障、放置等階段 |
 | `tcp_position` | `float64 [T,3]` | 規劃的 TCP 世界座標 |
-| `joint_angles_deg` | `float64 [T,J]` | 位置型 IK 求得的關節角 |
+| `tcp_rpy_deg` / `tcp_rotation` | `[T,3]` / `[T,3,3]` | 規劃的 TCP 姿態 |
+| `tool_frame` | `float64 [T,4,4]` | 六自由度 IK 回算的 TCP 世界姿態 |
+| `joint_angles_deg` | `float64 [T,J]` | 六自由度 IK 求得的關節角 |
 | `robot_joint_positions` | `float64 [T,J+1,3]` | 動畫用機械臂骨架 |
 | `gripper_opening_m` | `float64 [T]` | 平行夾爪開口 |
 | `attached` | `bool [T]` | 軟管夾取節點是否附著於 TCP |
 | `hose_nodes` | `float64 [T,N,3]` | 軟管中心線節點 |
-| `minimum_clearance_m` | `float64 [T]` | 軟管／夾爪至固定管路的最小外表面距離 |
+| `minimum_clearance_m` | `float64 [T]` | 機器人所有包覆體到桌面／管路的最小距離 |
+| `link_clearance_m` / `gripper_clearance_m` | `float64 [T]` | 連桿與夾爪分項最小距離 |
+| `hose_clearance_m` | `float64 [T]` | 軟管到固定管路的距離，獨立於機器人安全判定 |
 | `ik_position_error_m` | `float64 [T]` | TCP 目標與 FK 回算位置的誤差 |
+| `ik_orientation_error_deg` | `float64 [T]` | TCP 目標與 FK 回算姿態的角度誤差 |
 | `hose_length_ratio` | `float64 [T]` | 當前中心線總長相對初始總長 |
 
-第一版刻意只求 TCP **位置**，尚未約束夾爪朝向；夾爪碰撞採保守包覆球、軟管採離散節點與固定節長近似。後續接入物理引擎時應維持這些輸出欄位，額外增加接觸力、速度、材料參數與求解器資訊。
+第二版以姿態矩陣求六自由度 IK，並用膠囊體保守包覆機器人尺寸。自動 waypoint 目前每段最多插入一點，不能取代 OMPL／MoveIt 等完整規劃器；軟管仍採離散節點與固定節長近似。後續接入物理引擎時應維持這些輸出欄位，額外增加接觸力、速度、材料參數與求解器資訊。
+
+`outputs/motion/metrics.json` 另保存規劃器參數、原始／自動產生標記及完整規劃後關鍵幀，可用來重建「為何繞行」的決策過程。
 
 ### 第一個固定測試情境
 
@@ -231,7 +244,7 @@ flowchart LR
 
 - 狀態：桌上軟管穿過三根固定管路附近，六軸手臂執行預抓取、下降、閉爪、抬升、繞管、抽離、搬運、放置與退回。
 - 輸入：49 個等弧長軟管中心線節點、11 個關鍵幀、12 Hz、5 mm 教學安全餘量。
-- 求解：阻尼最小平方位置型 IK；軟管使用固定節長、重力、夾取節點附著與圓柱障礙投影。
+- 求解：阻尼最小平方六自由度 IK、膠囊體碰撞與自動 waypoint；軟管使用固定節長、重力、夾取節點附著與圓柱障礙投影。
 - 目的：先驗證資料格式、座標、可達性、連續性與距離警示，再以相同 `TrajectoryData` 介面替換成接觸物理。
 
 目前固定結果：
@@ -239,13 +252,14 @@ flowchart LR
 | 指標 | 結果 | 解讀 |
 |---|---:|---|
 | 動作長度 | 116 幀 / 9.6 s | 可播放及逐幀拖曳 |
-| 最大 IK 位置誤差 | 1.96 mm | 全部幀皆在 2 mm 容差內 |
-| 夾爪最小管路距離 | 39.61 mm | 保守包覆球未碰撞固定管路 |
-| 碰撞幀 | 0 | 0.25 mm 離散求解容差下無穿透 |
-| 低於 5 mm 安全餘量 | 59 幀 | 軟管貼近管路，動畫以橘色顯示，仍需改善路徑 |
-| 最大軟管長度誤差 | 0.94% | 幾何約束品質通過目前 1% 測試門檻 |
+| 原始／規劃後關鍵幀 | 11 / 12 | 自動插入 1 個安全 waypoint |
+| 最大 IK 位置／姿態誤差 | 1.77 mm / 0.26° | 全部幀通過 2 mm / 1° 容差 |
+| 機器人最小環境距離 | 5.59 mm | 包含連桿、關節、手掌、手指、桌面與管路 |
+| 機器人警示／碰撞幀 | 0 / 0 | 全部幀高於 5 mm 安全餘量 |
+| 軟管接觸／穿透幀 | 62 / 0 | 接觸允許，穿透才是幾何失敗 |
+| 最大軟管長度誤差 | 0.73% | 幾何約束品質通過目前 1% 測試門檻 |
 
-安全警示不是錯誤隱藏，而是本練習要觀察的結果：**無穿透不等於路徑具有足夠安全餘量**。數值以 `outputs/motion/metrics.json` 為準。
+機器人與軟管採不同判定：機器人必須保留安全餘量；軟管在抽取時可以接觸管路，但不應穿透。數值以 `outputs/motion/metrics.json` 為準。
 
 ## 調整場景
 
@@ -258,6 +272,7 @@ flowchart LR
 - `joint_limits_deg`：IK 可使用的關節角下限與上限。
 - `translation`：目前關節旋轉後，到下一關節的局部位移。
 - `opening`：平行夾爪開口。
+- `tcp_offset`：從最後一個 flange 到指尖 TCP 的局部座標偏移。
 - `point_count` / `points_per_link`：視覺化點數；越高越細緻，也越耗記憶體與瀏覽器效能。
 - `seed`：控制隨機表面取樣；相同設定與 seed 會產生相同點雲。
 - `camera.width` / `camera.height`：RGB-D 輸出解析度，需與 `aspect_ratio` 一致。
@@ -271,8 +286,9 @@ flowchart LR
 - `hose.control_points` / `node_count`：初始中心線與離散解析度。
 - `hose.grasp_node_index`：閉爪後附著於 TCP 的中心線節點。
 - `obstacles`：固定管路的起點、終點與半徑。
-- `keyframes`：每階段終點的 TCP、時間、夾爪開口與附著狀態。
-- `safe_clearance_m`：橘色近接警示門檻，不是碰撞容差。
+- `keyframes`：每階段終點的 TCP 位置、`tcp_rpy_deg` 姿態、時間、夾爪開口與附著狀態。
+- `waypoint_planner`：工具包覆半徑、搜尋步距與最大繞行距離；目前每段最多自動插入一點。
+- `safe_clearance_m`：機器人橘色近接警示門檻，不是碰撞容差。
 - `collision_tolerance_m`：離散約束的數值穿透容差；超過才計為碰撞。
 - `constraint_iterations`：越高越能維持管長，但 CPU 時間也越高；批次訓練不應產生 HTML。
 
@@ -320,13 +336,14 @@ pytest
 
 測試範圍包括：
 
-- 平移、旋轉與點座標轉換。
+- 平移、旋轉、四元數姿態往返／插值與點座標轉換。
+- 線段、膠囊體及桌面有號距離。
 - 盒體、圓柱及球體表面取樣是否符合幾何邊界。
 - 固定 seed 的場景是否可重現。
 - 關節、連桿與 TCP 結構是否一致。
-- 位置型 IK 是否在關節限制內到達每幀 TCP。
+- 六自由度 IK 是否在關節限制內到達每幀 TCP 位置與姿態。
 - 軟管夾取節點是否跟隨 TCP、總長誤差是否低於 1%。
-- 夾爪／軟管碰撞、5 mm 安全餘量警示與逐幀資料 shape。
+- 連桿／夾爪安全距離、軟管接觸／穿透、自動 waypoint 與逐幀資料 shape。
 - 物件是否位於桌面上方。
 - PLY 匯出格式是否具有正確標頭。
 - z-buffer 是否保留同像素最近點，以及深度能否正確回投影。
@@ -348,15 +365,15 @@ pytest
 
 ## 已知限制與開發順序
 
-目前已完成第一版相機投影、點式 z-buffer、深度／外參誤差、`RGBDFrame`，以及軟管時間序列、位置型 IK、固定管路距離與簡化夾爪碰撞。尚未包含 mesh rasterization、真實資料集 adapter、桌面分割、末端姿態 IK、完整連桿 swept-volume 碰撞、自動路徑規劃、抓取候選、接觸物理及 ROS 2 整合。
+目前已完成第一版相機投影、點式 z-buffer、深度／外參誤差、`RGBDFrame`，以及軟管時間序列、六自由度 IK、flange/TCP 標定、逐幀機器人膠囊體碰撞與單 waypoint 安全化。尚未包含 mesh rasterization、真實資料集 adapter、桌面分割、連續 swept-volume／自碰撞、完整取樣式路徑規劃、抓取候選、接觸物理及 ROS 2 整合。
 
 建議依下列順序擴充：
 
 1. **已完成第一版**：世界點投影、z-buffer、可見深度與 RGB-D 點雲。
 2. **已完成第一版**：深度量化、距離相關雜訊、孔洞、外參誤差與比較指標。
-3. **已完成第一版**：軟管幾何時間序列、關鍵幀狀態機、位置型 IK、關節限制、固定管路距離、簡化夾爪碰撞與動畫。
-4. 下一步：改善 59 個安全餘量警示幀，加入 TCP 姿態、完整連桿／夾爪幾何碰撞與自動 waypoint 搜尋。
-5. 接著以 MuJoCo 的一維 cable/flex 模型取代幾何約束，加入重力、摩擦、彎曲／扭轉、夾持接觸與 solver sensitivity 測試。
+3. **已完成第一版**：軟管幾何時間序列、關鍵幀狀態機、夾取附著、固定管路距離與動畫。
+4. **已完成第一版**：六自由度 IK、flange/TCP offset、連桿／夾爪膠囊體碰撞與單 waypoint 安全化；目前機器人警示／碰撞皆為 0 幀。
+5. **下一步**：以 MuJoCo 的一維 cable/flex 模型取代幾何約束，加入重力、摩擦、彎曲／扭轉、夾持接觸與 solver sensitivity 測試。
 6. 再為 `RGBDFrame` 實作桌面分割、物件點雲、AABB／OBB、法向與抓取候選，讓感知結果驅動相同動作管線。
 7. 最後視高精度柔性體、ROS 2 或大量合成資料需求，評估 SOFA、Gazebo 或 Isaac Sim，並接入真實資料 replay。
 

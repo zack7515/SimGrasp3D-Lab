@@ -4,6 +4,12 @@
   "table_top_z": 0.03,
   "safe_clearance_m": 0.005,
   "collision_tolerance_m": 0.00025,
+  "waypoint_planner": {
+    "enabled": true,
+    "tool_envelope_radius_m": 0.075,
+    "detour_step_m": 0.05,
+    "maximum_detour_m": 0.35
+  },
   "target_position": [0.18, 0.28, 0.05],
   "target_radius_m": 0.075,
   "hose": {
@@ -52,6 +58,7 @@
       "phase": "待機",
       "duration_s": 0.0,
       "tcp_position": [0.17, 0.11, 0.51],
+      "tcp_rpy_deg": [0.0, 60.0, 0.0],
       "gripper_opening_m": 0.095,
       "attached": false
     },
@@ -59,20 +66,23 @@
       "phase": "移至預抓取點",
       "duration_s": 1.2,
       "tcp_position": [0.1681, -0.1433, 0.24],
+      "tcp_rpy_deg": [0.0, 60.0, 0.0],
       "gripper_opening_m": 0.095,
       "attached": false
     },
     {
       "phase": "下降接近",
       "duration_s": 0.8,
-      "tcp_position": [0.1681, -0.1433, 0.042],
+      "tcp_position": [0.1681, -0.1433, 0.055],
+      "tcp_rpy_deg": [0.0, 60.0, 0.0],
       "gripper_opening_m": 0.095,
       "attached": false
     },
     {
       "phase": "閉爪夾取",
       "duration_s": 0.5,
-      "tcp_position": [0.1681, -0.1433, 0.042],
+      "tcp_position": [0.1681, -0.1433, 0.055],
+      "tcp_rpy_deg": [0.0, 60.0, 0.0],
       "gripper_opening_m": 0.026,
       "attached": true
     },
@@ -80,6 +90,7 @@
       "phase": "垂直抬升",
       "duration_s": 1.0,
       "tcp_position": [0.1681, -0.1433, 0.36],
+      "tcp_rpy_deg": [0.0, 60.0, 0.0],
       "gripper_opening_m": 0.026,
       "attached": true
     },
@@ -87,13 +98,15 @@
       "phase": "繞開立管",
       "duration_s": 1.2,
       "tcp_position": [0.02, -0.37, 0.46],
+      "tcp_rpy_deg": [0.0, 60.0, 0.0],
       "gripper_opening_m": 0.026,
       "attached": true
     },
     {
       "phase": "抽離管區",
       "duration_s": 1.2,
-      "tcp_position": [0.20, -0.37, 0.48],
+      "tcp_position": [0.20, -0.37, 0.20],
+      "tcp_rpy_deg": [0.0, 60.0, 0.0],
       "gripper_opening_m": 0.026,
       "attached": true
     },
@@ -101,20 +114,23 @@
       "phase": "移至放置區",
       "duration_s": 1.4,
       "tcp_position": [0.18, 0.28, 0.30],
+      "tcp_rpy_deg": [0.0, 60.0, 0.0],
       "gripper_opening_m": 0.026,
       "attached": true
     },
     {
       "phase": "下降放置",
       "duration_s": 0.8,
-      "tcp_position": [0.18, 0.28, 0.05],
+      "tcp_position": [0.18, 0.28, 0.055],
+      "tcp_rpy_deg": [0.0, 60.0, 0.0],
       "gripper_opening_m": 0.026,
       "attached": true
     },
     {
       "phase": "開爪釋放",
       "duration_s": 0.5,
-      "tcp_position": [0.18, 0.28, 0.05],
+      "tcp_position": [0.18, 0.28, 0.055],
+      "tcp_rpy_deg": [0.0, 60.0, 0.0],
       "gripper_opening_m": 0.095,
       "attached": false
     },
@@ -122,6 +138,7 @@
       "phase": "安全退回",
       "duration_s": 1.0,
       "tcp_position": [0.08, 0.18, 0.40],
+      "tcp_rpy_deg": [0.0, 60.0, 0.0],
       "gripper_opening_m": 0.095,
       "attached": false
     }

@@ -6,8 +6,19 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from simgrasp3d.geometry.sampling import PointCloud, sample_box, sample_cylinder_between, sample_sphere
-from simgrasp3d.geometry.transforms import pose_matrix, rotation_matrix, transform_points, translation_matrix
+from simgrasp3d.geometry.sampling import (
+    PointCloud,
+    sample_box,
+    sample_cylinder_between,
+    sample_sphere,
+)
+from simgrasp3d.geometry.transforms import (
+    pose_matrix,
+    rotation_matrix,
+    rotation_vector_from_matrix,
+    transform_points,
+    translation_matrix,
+)
 from simgrasp3d.models.specs import RobotSpec
 
 
@@ -23,12 +34,13 @@ class RobotState:
 
 @dataclass(frozen=True)
 class IKResult:
-    """位置型逆向運動學的解與收斂資訊。"""
+    """逆向運動學的關節解、末端誤差與收斂資訊。"""
 
     joint_angles_deg: np.ndarray
     joint_positions: np.ndarray
     tool_frame: np.ndarray
     position_error_m: float
+    orientation_error_deg: float
     converged: bool
     iterations: int
 
@@ -60,7 +72,9 @@ def forward_kinematics(
         current = current @ translation_matrix(link.translation)
         positions.append(current[:3, 3].copy())
 
-    return np.asarray(positions, dtype=np.float64), frames, current.copy()
+    frames["flange"] = current.copy()
+    tool_frame = current @ translation_matrix(robot.gripper.tcp_offset)
+    return np.asarray(positions, dtype=np.float64), frames, tool_frame
 
 
 def solve_position_ik(
@@ -127,7 +141,110 @@ def solve_position_ik(
         joint_positions=positions,
         tool_frame=tool_frame,
         position_error_m=position_error_m,
+        orientation_error_deg=0.0,
         converged=position_error_m <= tolerance_m,
+        iterations=iteration,
+    )
+
+
+def solve_pose_ik(
+    robot: RobotSpec,
+    target_position: np.ndarray | tuple[float, float, float],
+    target_rotation: np.ndarray,
+    initial_angles_deg: np.ndarray | tuple[float, ...] | None = None,
+    *,
+    position_tolerance_m: float = 0.002,
+    orientation_tolerance_deg: float = 1.0,
+    max_iterations: int = 160,
+    damping: float = 0.02,
+    orientation_weight_m_per_rad: float = 0.15,
+    maximum_step_deg: float = 5.0,
+) -> IKResult:
+    """以阻尼最小平方同步求解 TCP 三維位置與旋轉姿態。"""
+
+    target = np.asarray(target_position, dtype=np.float64)
+    target_rotation = np.asarray(target_rotation, dtype=np.float64)
+    if target.shape != (3,) or target_rotation.shape != (3, 3):
+        raise ValueError("target_position 與 target_rotation 尺寸不正確")
+    if initial_angles_deg is None:
+        angles = np.asarray(
+            [link.joint_angle_deg for link in robot.links],
+            dtype=np.float64,
+        )
+    else:
+        angles = np.asarray(initial_angles_deg, dtype=np.float64).copy()
+    if angles.shape != (len(robot.links),):
+        raise ValueError("initial_angles_deg 數量必須等於 robot.links 數量")
+
+    lower = np.asarray([link.joint_limits_deg[0] for link in robot.links])
+    upper = np.asarray([link.joint_limits_deg[1] for link in robot.links])
+    angles = np.clip(angles, lower, upper)
+    epsilon_deg = 0.05
+    orientation_tolerance_rad = np.deg2rad(orientation_tolerance_deg)
+    iteration = 0
+
+    for iteration in range(1, max_iterations + 1):
+        _, _, tool_frame = forward_kinematics(robot, angles)
+        position_error = target - tool_frame[:3, 3]
+        orientation_error = rotation_vector_from_matrix(
+            target_rotation @ tool_frame[:3, :3].T
+        )
+        if (
+            float(np.linalg.norm(position_error)) <= position_tolerance_m
+            and float(np.linalg.norm(orientation_error)) <= orientation_tolerance_rad
+        ):
+            break
+
+        jacobian = np.empty((6, len(angles)), dtype=np.float64)
+        denominator = np.deg2rad(2.0 * epsilon_deg)
+        for index in range(len(angles)):
+            plus = angles.copy()
+            minus = angles.copy()
+            plus[index] += epsilon_deg
+            minus[index] -= epsilon_deg
+            _, _, plus_tool = forward_kinematics(robot, plus)
+            _, _, minus_tool = forward_kinematics(robot, minus)
+            jacobian[:3, index] = (
+                plus_tool[:3, 3] - minus_tool[:3, 3]
+            ) / denominator
+            jacobian[3:, index] = (
+                orientation_weight_m_per_rad
+                * rotation_vector_from_matrix(
+                    plus_tool[:3, :3] @ minus_tool[:3, :3].T
+                )
+                / denominator
+            )
+
+        weighted_error = np.concatenate(
+            (position_error, orientation_weight_m_per_rad * orientation_error)
+        )
+        regularized = jacobian @ jacobian.T + (damping**2) * np.eye(6)
+        delta_rad = jacobian.T @ np.linalg.solve(regularized, weighted_error)
+        maximum_step_rad = np.deg2rad(maximum_step_deg)
+        delta_rad = np.clip(delta_rad, -maximum_step_rad, maximum_step_rad)
+        angles = np.clip(angles + np.rad2deg(delta_rad), lower, upper)
+
+    positions, _, tool_frame = forward_kinematics(robot, angles)
+    position_error_m = float(np.linalg.norm(target - tool_frame[:3, 3]))
+    orientation_error_deg = float(
+        np.rad2deg(
+            np.linalg.norm(
+                rotation_vector_from_matrix(
+                    target_rotation @ tool_frame[:3, :3].T
+                )
+            )
+        )
+    )
+    return IKResult(
+        joint_angles_deg=angles,
+        joint_positions=positions,
+        tool_frame=tool_frame,
+        position_error_m=position_error_m,
+        orientation_error_deg=orientation_error_deg,
+        converged=(
+            position_error_m <= position_tolerance_m
+            and orientation_error_deg <= orientation_tolerance_deg
+        ),
         iterations=iteration,
     )
 
@@ -141,14 +258,16 @@ def _gripper_clouds(
     palm_count = max(500, robot.points_per_link // 2)
     finger_count = max(700, robot.points_per_link // 2)
 
-    palm_local = translation_matrix((gripper.palm_size[0] / 2.0, 0.0, 0.0))
+    # TCP 位於兩指尖中央，夾爪本體沿工具座標 -x 往手腕方向延伸。
+    palm_x = -gripper.finger_size[0] - gripper.palm_size[0] / 2.0
+    palm_local = translation_matrix((palm_x, 0.0, 0.0))
     palm_points = transform_points(
         sample_box(gripper.palm_size, palm_count, rng),
         tool_frame @ palm_local,
     )
     clouds = [PointCloud("gripper_palm", palm_points, gripper.color, "gripper")]
 
-    finger_x = gripper.palm_size[0] + gripper.finger_size[0] / 2.0
+    finger_x = -gripper.finger_size[0] / 2.0
     finger_y = gripper.opening / 2.0 + gripper.finger_size[1] / 2.0
     for side, y_offset in (("left", finger_y), ("right", -finger_y)):
         finger_local = translation_matrix((finger_x, y_offset, 0.0))

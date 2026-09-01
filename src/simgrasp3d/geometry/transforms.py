@@ -90,3 +90,153 @@ def align_z_axis(direction: np.ndarray) -> np.ndarray:
     y_axis = np.cross(z_axis, x_axis)
     return np.column_stack((x_axis, y_axis, z_axis))
 
+
+def rotation_vector_from_matrix(rotation: np.ndarray) -> np.ndarray:
+    """將 3×3 旋轉矩陣轉成軸角旋轉向量，向量長度為弧度。"""
+
+    rotation = np.asarray(rotation, dtype=np.float64)
+    if rotation.shape != (3, 3):
+        raise ValueError("rotation 必須是 3×3 陣列")
+    cosine = float(np.clip((np.trace(rotation) - 1.0) / 2.0, -1.0, 1.0))
+    angle = float(np.arccos(cosine))
+    if angle <= 1e-10:
+        return np.zeros(3, dtype=np.float64)
+    if np.pi - angle <= 1e-5:
+        axis = np.sqrt(np.maximum((np.diag(rotation) + 1.0) / 2.0, 0.0))
+        axis[1] = np.copysign(axis[1], rotation[0, 1] + rotation[1, 0])
+        axis[2] = np.copysign(axis[2], rotation[0, 2] + rotation[2, 0])
+        norm = float(np.linalg.norm(axis))
+        axis = np.asarray([1.0, 0.0, 0.0]) if norm <= 1e-10 else axis / norm
+        return axis * angle
+    skew = np.asarray(
+        [
+            rotation[2, 1] - rotation[1, 2],
+            rotation[0, 2] - rotation[2, 0],
+            rotation[1, 0] - rotation[0, 1],
+        ]
+    )
+    return skew * (angle / (2.0 * np.sin(angle)))
+
+
+def quaternion_from_matrix(rotation: np.ndarray) -> np.ndarray:
+    """將 3×3 旋轉矩陣轉為 `[w, x, y, z]` 單位四元數。"""
+
+    rotation = np.asarray(rotation, dtype=np.float64)
+    if rotation.shape != (3, 3):
+        raise ValueError("rotation 必須是 3×3 陣列")
+    trace = float(np.trace(rotation))
+    if trace > 0.0:
+        scale = np.sqrt(trace + 1.0) * 2.0
+        quaternion = np.asarray(
+            [
+                0.25 * scale,
+                (rotation[2, 1] - rotation[1, 2]) / scale,
+                (rotation[0, 2] - rotation[2, 0]) / scale,
+                (rotation[1, 0] - rotation[0, 1]) / scale,
+            ]
+        )
+    else:
+        index = int(np.argmax(np.diag(rotation)))
+        following = (index + 1) % 3
+        remaining = (index + 2) % 3
+        scale = np.sqrt(
+            1.0
+            + rotation[index, index]
+            - rotation[following, following]
+            - rotation[remaining, remaining]
+        ) * 2.0
+        vector = np.zeros(3, dtype=np.float64)
+        vector[index] = 0.25 * scale
+        vector[following] = (
+            rotation[following, index] + rotation[index, following]
+        ) / scale
+        vector[remaining] = (
+            rotation[remaining, index] + rotation[index, remaining]
+        ) / scale
+        quaternion = np.asarray(
+            [
+                (rotation[remaining, following] - rotation[following, remaining])
+                / scale,
+                vector[0],
+                vector[1],
+                vector[2],
+            ]
+        )
+    return quaternion / np.linalg.norm(quaternion)
+
+
+def matrix_from_quaternion(quaternion: np.ndarray) -> np.ndarray:
+    """將 `[w, x, y, z]` 單位四元數轉為 3×3 旋轉矩陣。"""
+
+    quaternion = np.asarray(quaternion, dtype=np.float64)
+    if quaternion.shape != (4,):
+        raise ValueError("quaternion 必須包含 4 個數值")
+    norm = float(np.linalg.norm(quaternion))
+    if norm <= 1e-12:
+        raise ValueError("quaternion 長度不可為 0")
+    w, x, y, z = quaternion / norm
+    return np.asarray(
+        [
+            [
+                1.0 - 2.0 * (y * y + z * z),
+                2.0 * (x * y - z * w),
+                2.0 * (x * z + y * w),
+            ],
+            [
+                2.0 * (x * y + z * w),
+                1.0 - 2.0 * (x * x + z * z),
+                2.0 * (y * z - x * w),
+            ],
+            [
+                2.0 * (x * z - y * w),
+                2.0 * (y * z + x * w),
+                1.0 - 2.0 * (x * x + y * y),
+            ],
+        ],
+        dtype=np.float64,
+    )
+
+
+def quaternion_slerp(first: np.ndarray, second: np.ndarray, fraction: float) -> np.ndarray:
+    """沿最短旋轉路徑進行單位四元數球面線性插值。"""
+
+    first = np.asarray(first, dtype=np.float64).copy()
+    second = np.asarray(second, dtype=np.float64).copy()
+    if first.shape != (4,) or second.shape != (4,):
+        raise ValueError("四元數必須包含 4 個數值")
+    first_norm = float(np.linalg.norm(first))
+    second_norm = float(np.linalg.norm(second))
+    if first_norm <= 1e-12 or second_norm <= 1e-12:
+        raise ValueError("四元數長度不可為 0")
+    if not 0.0 <= fraction <= 1.0:
+        raise ValueError("fraction 必須位於 0 到 1 之間")
+    first /= first_norm
+    second /= second_norm
+    dot = float(np.dot(first, second))
+    if dot < 0.0:
+        second = -second
+        dot = -dot
+    dot = float(np.clip(dot, -1.0, 1.0))
+    if dot > 0.9995:
+        result = first + fraction * (second - first)
+        return result / np.linalg.norm(result)
+    angle = float(np.arccos(dot))
+    sine = float(np.sin(angle))
+    return (
+        np.sin((1.0 - fraction) * angle) / sine * first
+        + np.sin(fraction * angle) / sine * second
+    )
+
+
+def rpy_deg_from_matrix(rotation: np.ndarray) -> np.ndarray:
+    """將旋轉矩陣轉為固定軸 roll、pitch、yaw 角度。"""
+
+    rotation = np.asarray(rotation, dtype=np.float64)
+    pitch = float(np.arcsin(np.clip(-rotation[2, 0], -1.0, 1.0)))
+    if abs(float(np.cos(pitch))) > 1e-8:
+        roll = float(np.arctan2(rotation[2, 1], rotation[2, 2]))
+        yaw = float(np.arctan2(rotation[1, 0], rotation[0, 0]))
+    else:
+        roll = 0.0
+        yaw = float(np.arctan2(-rotation[0, 1], rotation[1, 1]))
+    return np.rad2deg(np.asarray([roll, pitch, yaw]))
