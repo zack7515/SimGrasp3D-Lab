@@ -54,6 +54,7 @@ python scripts/run_scene.py
 
 ```text
 outputs/
+├── simulation_report.html    # 原始世界與感測結果的單頁雙畫面報告
 ├── tabletop_scene.html       # 可離線開啟的互動式 3D 場景
 ├── point_clouds/
 │   ├── complete_scene.ply    # 合併後的完整場景點雲
@@ -71,6 +72,8 @@ outputs/
 ```
 
 `outputs/` 是可重建產物，已由 Git 忽略，不會進入版本歷史。
+
+建議優先開啟 `outputs/simulation_report.html`。左側是原始 3D 世界，右側是同一場景的 RGB-D ground truth、observation、絕對誤差與 RGB；頁首會列出測試條件，頁面下方包含全部量化指標。執行 `simgrasp3d --open` 時只會開啟這份整合報告，不再彈出兩個分離頁面。
 
 ## 專案結構
 
@@ -110,6 +113,7 @@ simgrasp3d-lab/
 | `src/simgrasp3d/sensors/rgbd.py` | 定義 `RGBDFrame`，執行投影、z-buffer、回投影及深度／外參誤差模擬 | 修改相機模型或真實資料轉接格式時 |
 | `src/simgrasp3d/visualization/plotly_viewer.py` | 建立互動式圖層、座標軸、hover 資訊與 HTML | 改善視覺呈現或除錯資訊時 |
 | `src/simgrasp3d/visualization/rgbd_viewer.py` | 比較理想深度、觀測深度、絕對誤差與 RGB | 分析感測品質時 |
+| `src/simgrasp3d/visualization/simulation_report.py` | 將原始 3D 世界、感測比較、測試條件與全部指標組成單頁雙畫面報告 | 調整整合報告資訊或版面時 |
 | `src/simgrasp3d/io/point_cloud.py` | 清理檔名並輸出個別或合併的 ASCII PLY | 支援 PCD、二進位 PLY 或其他格式時 |
 | `src/simgrasp3d/io/rgbd_frame.py` | 讀寫壓縮 NPZ、可見點雲及 JSON 模擬指標 | 匯入真實資料或擴充 schema 時 |
 | `src/simgrasp3d/cli.py` | 串接設定載入、場景建立、HTML/PLY 輸出與瀏覽器開啟 | 新增命令列參數或工作流程時 |
@@ -136,6 +140,8 @@ flowchart LR
     J --> K[Observation RGB-D]
     I --> L[誤差指標與比較 HTML]
     K --> L
+    E --> M[單頁雙畫面驗證報告]
+    L --> M
 ```
 
 完整場景 PLY 仍是所有取樣表面的 ground truth；`outputs/sensor/` 則是經相機投影與 z-buffer 後的可見資料。第一版使用離散表面點投影，不是 mesh triangle rasterization，因此影像填充率會受 `point_count` 影響，不能把空白像素全都解讀成真實相機失效。
@@ -206,7 +212,8 @@ flowchart LR
 simgrasp3d \
   --config configs/scenes/tabletop_demo.json \
   --output outputs/custom_scene.html \
-  --point-cloud-dir outputs/custom_clouds
+  --point-cloud-dir outputs/custom_clouds \
+  --report-output outputs/custom_report.html
 ```
 
 只建立 HTML、不匯出 PLY：
@@ -244,6 +251,7 @@ pytest
 - z-buffer 是否保留同像素最近點，以及深度能否正確回投影。
 - 深度雜訊、量化、外參擾動是否固定 seed 重現。
 - `RGBDFrame` 壓縮 NPZ 是否能無損往返。
+- 單頁報告是否同時包含原始世界、感測畫面、測試情境與所有 metrics，且不依賴外部 script。
 
 ## 資料與文件
 

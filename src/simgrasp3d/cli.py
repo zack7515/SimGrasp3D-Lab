@@ -12,6 +12,7 @@ from simgrasp3d.scene.builder import build_scene, load_scene_spec
 from simgrasp3d.sensors.rgbd import simulate_rgbd
 from simgrasp3d.visualization.plotly_viewer import write_scene_html
 from simgrasp3d.visualization.rgbd_viewer import write_rgbd_comparison_html
+from simgrasp3d.visualization.simulation_report import write_simulation_report
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -45,9 +46,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="RGB-D frame、可見點雲、比較頁面與指標輸出目錄",
     )
     parser.add_argument(
+        "--report-output",
+        type=Path,
+        default=Path("outputs/simulation_report.html"),
+        help="原始場景與感測結果的單頁雙畫面報告路徑",
+    )
+    parser.add_argument(
         "--no-export-point-clouds",
         action="store_true",
-        help="只建立 HTML，不匯出 PLY",
+        help="不匯出完整場景 PLY；RGB-D 感測產物不受影響",
     )
     parser.add_argument(
         "--no-simulate-rgbd",
@@ -87,13 +94,18 @@ def main(argv: list[str] | None = None) -> int:
     if exported_count:
         print(f"PLY 點雲：{args.point_cloud_dir.resolve()}（{exported_count} 個檔案）")
 
-    comparison_path: Path | None = None
+    report_path: Path | None = None
     if not args.no_simulate_rgbd:
         sensor_result = simulate_rgbd(scene_data)
         sensor_paths = export_rgbd_simulation(args.sensor_output_dir, sensor_result)
         comparison_path = write_rgbd_comparison_html(
             sensor_result,
             args.sensor_output_dir / "rgbd_comparison.html",
+        ).resolve()
+        report_path = write_simulation_report(
+            scene_data,
+            sensor_result,
+            args.report_output,
         ).resolve()
         metrics = sensor_result.metrics
         print(
@@ -104,11 +116,11 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"RGB-D frame：{sensor_paths['observation_frame'].resolve()}")
         print(f"RGB-D 比較：{comparison_path}")
+        print(f"單頁驗證報告：{report_path}")
 
     if args.open:
-        webbrowser.open(html_path.as_uri())
-        if comparison_path is not None:
-            webbrowser.open(comparison_path.as_uri())
+        browser_target = report_path if report_path is not None else html_path
+        webbrowser.open(browser_target.as_uri())
     return 0
 
 
