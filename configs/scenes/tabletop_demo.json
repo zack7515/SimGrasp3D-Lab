@@ -89,6 +89,13 @@
         "joint_angle_deg": -34.0,
         "translation": [0.10, 0.0, 0.0],
         "radius": 0.030
+      },
+      {
+        "name": "tool_yaw",
+        "joint_axis": "z",
+        "joint_angle_deg": 0.0,
+        "translation": [0.08, 0.0, 0.0],
+        "radius": 0.026
       }
     ],
     "gripper": {
