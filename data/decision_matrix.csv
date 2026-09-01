@@ -1,0 +1,8 @@
+criterion,weight,score_definition_1,score_definition_5
+metric_depth_reliability,0.25,尺度或深度不穩定,工作範圍內幾何高度可靠
+occlusion_recovery,0.15,單視角且無恢復,多視角或主動觀測可恢復
+difficult_surface_robustness,0.10,透明反光黑色表面常失敗,多模態與失敗恢復完整
+dynamic_scene,0.10,要求場景靜止且擷取慢,高幀率低延遲並可追蹤
+low_hardware_cost,0.10,硬體與整合成本很高,一般相機即可
+integration_ease,0.10,需多感測器同步與客製工程,驅動及軟體生態成熟且簡單
+production_maturity,0.20,研究展示為主,已有成熟工具鏈與量產案例

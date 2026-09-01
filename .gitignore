@@ -1,0 +1,74 @@
+# 作業系統與編輯器暫存
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Python、測試與建置快取
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+
+# ROS 2 與模擬器產物
+install/
+log/
+logs/
+runs/
+outputs/
+results/local/
+*.bag
+*.bag.active
+*.db3
+*.mcap
+*.ulg
+
+# 大型模型與本機資料；正式發布時改用 Git LFS 或外部資料版本
+checkpoints/
+models/
+weights/
+data/raw/
+data/bags/
+data/cache/
+*.ckpt
+*.onnx
+*.engine
+*.pth
+*.pt
+
+# 憑證、環境變數與本機設定
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials/
+secrets/
+private/
+local/
+config/local.*
+configs/local/
+
+# 個人或工具專屬的工作區資訊
+.agents/
+.co[d]ex/
+.cl[a]ude/
+AGENTS.md
+CL[A]UDE.md
+*co[d]ex*
+*Co[d]ex*
+*cl[a]ude*
+*Cl[a]ude*

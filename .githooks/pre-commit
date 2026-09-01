@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 僅檢查即將提交的新增或修改檔案，避免讀取未納入版本控制的私人內容。
+mapfile -d '' staged_files < <(git diff --cached --name-only --diff-filter=ACMR -z)
+
+if ((${#staged_files[@]} == 0)); then
+  exit 0
+fi
+
+blocked_name_pattern='(co''dex|cl''aude|g''utc)'
+blocked_content_pattern='(co''dex|cl''aude|g''utc|co-''authored-by|co-''author)'
+email_pattern='[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}'
+home_path_pattern='/(home|Users)/[^/[:space:]]+'
+secret_pattern='(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,})'
+
+failed=0
+
+for file in "${staged_files[@]}"; do
+  if [[ "$file" =~ $blocked_name_pattern ]]; then
+    printf '拒絕提交：檔名包含不應公開的個人或工具識別字：%s\n' "$file" >&2
+    failed=1
+  fi
+
+  # Hook 內含掃描規則本身，因此只檢查其他公開內容。
+  if [[ "$file" == .githooks/* ]] || ! git cat-file -e ":$file" 2>/dev/null; then
+    continue
+  fi
+
+  staged_content=$(git show ":$file" 2>/dev/null || true)
+  if printf '%s' "$staged_content" | grep -Eiq "$blocked_content_pattern"; then
+    printf '拒絕提交：內容包含不應公開的個人、工具或共著識別字：%s\n' "$file" >&2
+    failed=1
+  fi
+  if printf '%s' "$staged_content" | grep -Eiq "$email_pattern|$home_path_pattern|$secret_pattern"; then
+    printf '拒絕提交：內容疑似包含電子郵件、本機家目錄或憑證：%s\n' "$file" >&2
+    failed=1
+  fi
+done
+
+if ((failed)); then
+  printf '請移除敏感內容，或將只供本機使用的檔案加入 .gitignore。\n' >&2
+  exit 1
+fi

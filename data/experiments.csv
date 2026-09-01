@@ -1,0 +1,14 @@
+year,project,modality,task,real_world_evidence,reported_number,limitation,source
+2017,Dex-Net 2.0,RGB-D,單物件平行夾爪抓取,ABB YuMi實體測試,94%成功率且99% precision並平均2.5秒規劃,受控單物件且多為top-down,https://goldberg.berkeley.edu/pubs/dex-net-2.0-Camera-Ready-RSS-2017.pdf
+2020,GraspNet-1Billion,RGB-D,雜亂場景6D抓取,資料集與實機一致性實驗,97280張影像190場景88物件超過十億抓取標註,資料集AP不等於端到端任務成功率,https://openaccess.thecvf.com/content_CVPR_2020/papers/Fang_GraspNet-1Billion_A_Large-Scale_Benchmark_for_General_Object_Grasping_CVPR_2020_paper.pdf
+2021,Contact-GraspNet,Depth或PointCloud,雜亂場景6DoF抓取,官方程式模型及機器人影片,官方建議推論GPU至少8GB VRAM,舊版TensorFlow與CUDA依賴,https://github.com/NVlabs/contact_graspnet
+2022-2023,AnyGrasp,PointCloud,靜態與動態7DoF抓取,超過300個未見物清箱及移動物抓取,93.3%清箱成功率且單臂超過900 mean picks/hour,實驗條件特定且SDK授權需確認,https://arxiv.org/abs/2212.08333
+2022,MegaPose,RGB或RGB-D加CAD,Novel object 6D pose後執行預定義抓取,官方實機操作展示,合成大規模訓練且可不重訓處理新CAD,需CAD及物件ROI,https://megapose6d.github.io/
+2022-2023,TransCG,RGB-D,透明物深度補全與抓取,真實資料及實機抓取baseline,57715張影像51透明物130場景,專門資料與補全管線,https://github.com/galaxies99/transcg
+2023,MonoGraspNet,單RGB,6DoF抓取,ICRA專案與資料工具公開,單張RGB直接預測6DoF grasp,尺度與跨域精度風險,https://sites.google.com/view/monograsp/about
+2023,RT-2,RGB加語言,端到端閉迴路控制,超過6000次機器人試驗,未見情境32%提升到62%,閉源且非幾何安全證明,https://deepmind.google/blog/rt-2-new-model-translates-vision-and-language-into-action/
+2024,FoundationPose,RGB-D加CAD或參考影像,Novel object 6D pose與追蹤,官方部署模型與robot manipulation案例,CVPR 2024 Highlight,需要物件mask及CAD或參考資料,https://nvlabs.github.io/FoundationPose/
+2024,Octo,多資料集影像語言與狀態,Generalist robot policy,跨機構實機評估,4機構9套真實機器人,新平台通常仍需微調,https://octo-models.github.io/
+2024,OpenVLA,RGB加語言,Generalist VLA控制,WidowX Google Robot與微調後Franka,970k episodes與7B參數,需要robot-specific資料及action normalization,https://openvla.github.io/
+2024-2025,BOP Challenge 2024,RGB與RGB-D,Seen或unseen物件6D pose,公開資料集與評測伺服器,新增model-free 6D detection及三個資料集,pose benchmark不等於完整抓放成功率,https://bop.felk.cvut.cz/challenges/bop-challenge-2024/
+2026,pi0.7,多模態VLA,跨機器人多任務控制,官方多平台實驗,涵蓋速度靈巧操作語言與組合泛化,前沿研究仍需獨立安全層,https://www.pi.website/download/pi07.pdf

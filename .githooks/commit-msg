@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+message_file=${1:?缺少 commit message 檔案}
+blocked_pattern='(co''dex|cl''aude|g''utc|co-''authored-by|co-''author)'
+
+if grep -Eiq "$blocked_pattern" "$message_file"; then
+  printf '拒絕提交：commit message 包含不應公開的個人、工具或共著識別字。\n' >&2
+  exit 1
+fi
