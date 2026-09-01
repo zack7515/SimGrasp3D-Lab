@@ -21,21 +21,115 @@ class RobotState:
     tool_frame: np.ndarray
 
 
-def forward_kinematics(robot: RobotSpec) -> tuple[np.ndarray, dict[str, np.ndarray], np.ndarray]:
+@dataclass(frozen=True)
+class IKResult:
+    """位置型逆向運動學的解與收斂資訊。"""
+
+    joint_angles_deg: np.ndarray
+    joint_positions: np.ndarray
+    tool_frame: np.ndarray
+    position_error_m: float
+    converged: bool
+    iterations: int
+
+
+def forward_kinematics(
+    robot: RobotSpec,
+    joint_angles_deg: np.ndarray | tuple[float, ...] | None = None,
+) -> tuple[np.ndarray, dict[str, np.ndarray], np.ndarray]:
     """計算每個關節位置、關節座標系與末端工具姿態。"""
+
+    if joint_angles_deg is None:
+        angles = np.asarray(
+            [link.joint_angle_deg for link in robot.links],
+            dtype=np.float64,
+        )
+    else:
+        angles = np.asarray(joint_angles_deg, dtype=np.float64)
+    if angles.shape != (len(robot.links),):
+        raise ValueError("joint_angles_deg 數量必須等於 robot.links 數量")
 
     base_transform = pose_matrix(robot.base_pose.xyz, robot.base_pose.rpy_deg)
     current = base_transform @ translation_matrix((0.0, 0.0, robot.base_size[2]))
     positions = [current[:3, 3].copy()]
     frames: dict[str, np.ndarray] = {"robot_base": base_transform.copy()}
 
-    for link in robot.links:
-        current = current @ rotation_matrix(link.joint_axis, link.joint_angle_deg)
+    for link, angle_deg in zip(robot.links, angles, strict=True):
+        current = current @ rotation_matrix(link.joint_axis, float(angle_deg))
         frames[link.name] = current.copy()
         current = current @ translation_matrix(link.translation)
         positions.append(current[:3, 3].copy())
 
     return np.asarray(positions, dtype=np.float64), frames, current.copy()
+
+
+def solve_position_ik(
+    robot: RobotSpec,
+    target_position: np.ndarray | tuple[float, float, float],
+    initial_angles_deg: np.ndarray | tuple[float, ...] | None = None,
+    *,
+    tolerance_m: float = 0.002,
+    max_iterations: int = 120,
+    damping: float = 0.035,
+    maximum_step_deg: float = 7.0,
+) -> IKResult:
+    """以阻尼最小平方求解 TCP 位置，姿態暫不納入第一階段。"""
+
+    target = np.asarray(target_position, dtype=np.float64)
+    if target.shape != (3,):
+        raise ValueError("target_position 必須是三維座標")
+    if initial_angles_deg is None:
+        angles = np.asarray(
+            [link.joint_angle_deg for link in robot.links],
+            dtype=np.float64,
+        )
+    else:
+        angles = np.asarray(initial_angles_deg, dtype=np.float64).copy()
+    if angles.shape != (len(robot.links),):
+        raise ValueError("initial_angles_deg 數量必須等於 robot.links 數量")
+
+    lower = np.asarray([link.joint_limits_deg[0] for link in robot.links])
+    upper = np.asarray([link.joint_limits_deg[1] for link in robot.links])
+    angles = np.clip(angles, lower, upper)
+    epsilon_deg = 0.08
+    iteration = 0
+
+    for iteration in range(1, max_iterations + 1):
+        positions, _, tool_frame = forward_kinematics(robot, angles)
+        error = target - tool_frame[:3, 3]
+        if float(np.linalg.norm(error)) <= tolerance_m:
+            break
+
+        jacobian = np.empty((3, len(angles)), dtype=np.float64)
+        for index in range(len(angles)):
+            plus = angles.copy()
+            minus = angles.copy()
+            plus[index] += epsilon_deg
+            minus[index] -= epsilon_deg
+            _, _, plus_tool = forward_kinematics(robot, plus)
+            _, _, minus_tool = forward_kinematics(robot, minus)
+            # 導數以弧度為單位，方便限制每輪關節更新幅度。
+            denominator = np.deg2rad(2.0 * epsilon_deg)
+            jacobian[:, index] = (
+                plus_tool[:3, 3] - minus_tool[:3, 3]
+            ) / denominator
+
+        regularized = jacobian @ jacobian.T + (damping**2) * np.eye(3)
+        delta_rad = jacobian.T @ np.linalg.solve(regularized, error)
+        maximum_step_rad = np.deg2rad(maximum_step_deg)
+        delta_rad = np.clip(delta_rad, -maximum_step_rad, maximum_step_rad)
+        angles = np.clip(angles + np.rad2deg(delta_rad), lower, upper)
+
+    positions, _, tool_frame = forward_kinematics(robot, angles)
+    position_error_m = float(np.linalg.norm(target - tool_frame[:3, 3]))
+    return IKResult(
+        joint_angles_deg=angles,
+        joint_positions=positions,
+        tool_frame=tool_frame,
+        position_error_m=position_error_m,
+        converged=position_error_m <= tolerance_m,
+        iterations=iteration,
+    )
 
 
 def _gripper_clouds(
@@ -105,4 +199,3 @@ def build_robot_state(robot: RobotSpec, rng: np.random.Generator) -> RobotState:
     clouds.extend(_gripper_clouds(robot, tool_frame, rng))
     frames["tool"] = tool_frame.copy()
     return RobotState(tuple(clouds), joint_positions, frames, tool_frame)
-

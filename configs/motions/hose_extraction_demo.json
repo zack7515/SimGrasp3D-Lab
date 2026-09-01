@@ -1,0 +1,129 @@
+{
+  "name": "hose_extraction_learning_sequence",
+  "frame_rate_hz": 12,
+  "table_top_z": 0.03,
+  "safe_clearance_m": 0.005,
+  "collision_tolerance_m": 0.00025,
+  "target_position": [0.18, 0.28, 0.05],
+  "target_radius_m": 0.075,
+  "hose": {
+    "name": "teal_service_hose",
+    "radius": 0.012,
+    "node_count": 49,
+    "grasp_node_index": 23,
+    "control_points": [
+      [-0.18, -0.34, 0.042],
+      [-0.04, -0.29, 0.042],
+      [0.10, -0.20, 0.042],
+      [0.22, -0.10, 0.042],
+      [0.33, -0.08, 0.042],
+      [0.45, 0.15, 0.042]
+    ],
+    "color": [0.04, 0.63, 0.68],
+    "constraint_iterations": 64,
+    "follow_decay_nodes": 10.0,
+    "gravity_step_m": 0.0015
+  },
+  "obstacles": [
+    {
+      "name": "vertical_riser",
+      "start": [0.31, -0.01, 0.03],
+      "end": [0.31, -0.01, 0.40],
+      "radius": 0.032,
+      "color": [0.32, 0.40, 0.47]
+    },
+    {
+      "name": "cross_pipe",
+      "start": [0.03, 0.08, 0.18],
+      "end": [0.50, 0.08, 0.18],
+      "radius": 0.030,
+      "color": [0.38, 0.46, 0.52]
+    },
+    {
+      "name": "low_return_pipe",
+      "start": [0.02, -0.30, 0.10],
+      "end": [0.50, -0.30, 0.10],
+      "radius": 0.028,
+      "color": [0.27, 0.36, 0.43]
+    }
+  ],
+  "keyframes": [
+    {
+      "phase": "待機",
+      "duration_s": 0.0,
+      "tcp_position": [0.17, 0.11, 0.51],
+      "gripper_opening_m": 0.095,
+      "attached": false
+    },
+    {
+      "phase": "移至預抓取點",
+      "duration_s": 1.2,
+      "tcp_position": [0.1681, -0.1433, 0.24],
+      "gripper_opening_m": 0.095,
+      "attached": false
+    },
+    {
+      "phase": "下降接近",
+      "duration_s": 0.8,
+      "tcp_position": [0.1681, -0.1433, 0.042],
+      "gripper_opening_m": 0.095,
+      "attached": false
+    },
+    {
+      "phase": "閉爪夾取",
+      "duration_s": 0.5,
+      "tcp_position": [0.1681, -0.1433, 0.042],
+      "gripper_opening_m": 0.026,
+      "attached": true
+    },
+    {
+      "phase": "垂直抬升",
+      "duration_s": 1.0,
+      "tcp_position": [0.1681, -0.1433, 0.36],
+      "gripper_opening_m": 0.026,
+      "attached": true
+    },
+    {
+      "phase": "繞開立管",
+      "duration_s": 1.2,
+      "tcp_position": [0.02, -0.37, 0.46],
+      "gripper_opening_m": 0.026,
+      "attached": true
+    },
+    {
+      "phase": "抽離管區",
+      "duration_s": 1.2,
+      "tcp_position": [0.20, -0.37, 0.48],
+      "gripper_opening_m": 0.026,
+      "attached": true
+    },
+    {
+      "phase": "移至放置區",
+      "duration_s": 1.4,
+      "tcp_position": [0.18, 0.28, 0.30],
+      "gripper_opening_m": 0.026,
+      "attached": true
+    },
+    {
+      "phase": "下降放置",
+      "duration_s": 0.8,
+      "tcp_position": [0.18, 0.28, 0.05],
+      "gripper_opening_m": 0.026,
+      "attached": true
+    },
+    {
+      "phase": "開爪釋放",
+      "duration_s": 0.5,
+      "tcp_position": [0.18, 0.28, 0.05],
+      "gripper_opening_m": 0.095,
+      "attached": false
+    },
+    {
+      "phase": "安全退回",
+      "duration_s": 1.0,
+      "tcp_position": [0.08, 0.18, 0.40],
+      "gripper_opening_m": 0.095,
+      "attached": false
+    }
+  ]
+}

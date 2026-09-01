@@ -104,6 +104,7 @@ class RobotLinkSpec:
     joint_angle_deg: float
     translation: Vector3
     radius: float
+    joint_limits_deg: tuple[float, float]
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> RobotLinkSpec:
@@ -112,12 +113,23 @@ class RobotLinkSpec:
             raise ValueError(f"joint_axis 必須是 x、y 或 z：{axis}")
         radius = float(data["radius"])
         _positive((radius,), f"robot.links[{data['name']}].radius")
+        limits = tuple(float(value) for value in data.get("joint_limits_deg", [-180.0, 180.0]))
+        if len(limits) != 2 or limits[0] >= limits[1]:
+            raise ValueError(
+                f"robot.links[{data['name']}].joint_limits_deg 必須是遞增的兩個角度"
+            )
+        joint_angle_deg = float(data["joint_angle_deg"])
+        if not limits[0] <= joint_angle_deg <= limits[1]:
+            raise ValueError(
+                f"robot.links[{data['name']}].joint_angle_deg 超出關節限制"
+            )
         return cls(
             name=str(data["name"]),
             joint_axis=axis,
-            joint_angle_deg=float(data["joint_angle_deg"]),
+            joint_angle_deg=joint_angle_deg,
             translation=_vector3(data["translation"], "robot.link.translation"),
             radius=radius,
+            joint_limits_deg=(limits[0], limits[1]),
         )
 
 

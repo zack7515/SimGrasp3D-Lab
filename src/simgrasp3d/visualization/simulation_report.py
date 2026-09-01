@@ -8,8 +8,10 @@ from pathlib import Path
 from plotly.io import to_html
 from plotly.offline import get_plotlyjs
 
+from simgrasp3d.models.motion import TrajectoryData
 from simgrasp3d.scene.builder import SceneData
 from simgrasp3d.sensors.rgbd import RGBDSimulationResult
+from simgrasp3d.visualization.motion_viewer import build_motion_figure
 from simgrasp3d.visualization.plotly_viewer import build_figure
 from simgrasp3d.visualization.rgbd_viewer import build_rgbd_comparison_figure
 
@@ -372,6 +374,62 @@ main {
   line-height: 1.6;
 }
 
+.motion-section {
+  margin-top: 14px;
+}
+
+.motion-section .pane-code { background: var(--cyan); }
+
+.phase-rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+  border-bottom: 1px solid var(--line);
+  background: #edf3f4;
+}
+
+.phase-step {
+  position: relative;
+  min-width: 0;
+  padding: 10px 10px 10px 34px;
+  border-right: 1px solid #d4dfe2;
+  color: var(--steel);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.phase-step:last-child { border-right: 0; }
+
+.phase-index {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  color: #ffffff;
+  background: var(--steel);
+  border-radius: 50%;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+}
+
+.motion-plot {
+  min-height: 720px;
+  background: #f7fafb;
+}
+
+.motion-plot > div { width: 100% !important; }
+
+.motion-note {
+  padding: 11px 16px;
+  color: var(--slate);
+  background: #f1f5f6;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
 @media (max-width: 1180px) {
   .workbench,
   .context-strip { grid-template-columns: 1fr; }
@@ -392,6 +450,7 @@ main {
   .pane-header { align-items: flex-start; }
   .pane-badge { display: none; }
   .plot-shell { min-height: 560px; }
+  .motion-plot { min-height: 620px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -462,12 +521,114 @@ def _condition(label: str, value: str, noise: bool = False) -> str:
     )
 
 
+def _motion_metric_table(trajectory: TrajectoryData) -> str:
+    """建立運動學、碰撞與軟管約束的完整指標表。"""
+
+    labels = {
+        "frame_count": "動畫幀數",
+        "duration_s": "動作總時間",
+        "minimum_clearance_m": "全體最小距離",
+        "minimum_hose_clearance_m": "軟管最小距離",
+        "minimum_tool_clearance_m": "夾爪最小距離",
+        "collision_frame_count": "碰撞幀數",
+        "unsafe_clearance_frame_count": "低於安全餘量幀數",
+        "maximum_ik_error_m": "最大 IK 位置誤差",
+        "failed_ik_frame_count": "IK 失敗幀數",
+        "maximum_hose_length_error_ratio": "最大軟管長度誤差",
+        "attached_frame_count": "夾持狀態幀數",
+    }
+    rows = []
+    for key, value in trajectory.metrics.items():
+        if key.endswith("_m"):
+            display = f"{float(value) * 1000.0:.3f} mm"
+        elif key.endswith("_ratio"):
+            display = f"{float(value) * 100.0:.3f}%"
+        elif key == "duration_s":
+            display = f"{float(value):.2f} s"
+        else:
+            display = f"{int(value):,}"
+        rows.append(
+            "<tr>"
+            f'<th scope="row">{escape(labels.get(key, key))}</th>'
+            f"<td>{escape(display)}</td>"
+            f"<td>{escape(key)}</td>"
+            "</tr>"
+        )
+    return "".join(rows)
+
+
+def _motion_section(
+    scene_data: SceneData,
+    trajectory: TrajectoryData | None,
+) -> str:
+    """建立可選的 C 區連續動作動畫與量化結果。"""
+
+    if trajectory is None:
+        return ""
+    figure = build_motion_figure(
+        trajectory,
+        scene_data.spec.robot,
+        scene_data.spec.table,
+    )
+    motion_html = to_html(
+        figure,
+        include_plotlyjs=False,
+        full_html=False,
+        div_id="motion-view",
+        config={"displaylogo": False, "responsive": True, "scrollZoom": True},
+    )
+    phases: list[str] = []
+    for keyframe in trajectory.spec.keyframes:
+        if not phases or phases[-1] != keyframe.phase:
+            phases.append(keyframe.phase)
+    phase_rail = "".join(
+        f'<div class="phase-step"><span class="phase-index">{index:02d}</span>{escape(phase)}</div>'
+        for index, phase in enumerate(phases, start=1)
+    )
+    metrics = trajectory.metrics
+    motion_cards = "".join(
+        (
+            f'<div class="metric {class_name}">'
+            f'<span class="metric-label">{escape(label)}</span>'
+            f'<span class="metric-value">{escape(value)}</span>'
+            "</div>"
+        )
+        for label, value, class_name in (
+            ("DURATION", f"{float(metrics['duration_s']):.1f} s", "accent"),
+            ("FRAMES", f"{int(metrics['frame_count'])}", ""),
+            ("MAX IK ERROR", f"{float(metrics['maximum_ik_error_m']) * 1000.0:.2f} mm", ""),
+            ("TOOL CLEARANCE", f"{float(metrics['minimum_tool_clearance_m']) * 1000.0:.1f} mm", "accent"),
+            ("CLEARANCE WARN", f"{int(metrics['unsafe_clearance_frame_count'])}", "warning"),
+            ("COLLISION FRAMES", f"{int(metrics['collision_frame_count'])}", "accent"),
+        )
+    )
+    return f"""
+    <section class="pane motion-section" aria-label="軟管夾取連續動作動畫">
+      <header class="pane-header">
+        <div class="pane-title"><span class="pane-code">C</span><div><h2>軟管抽取與搬運時間序列</h2><p>位置型 IK、固定節長軟管、管路距離與夾取附著狀態</p></div></div>
+        <span class="pane-badge">KINEMATIC LEARNING</span>
+      </header>
+      <div class="phase-rail" aria-label="動作階段">{phase_rail}</div>
+      <div class="motion-plot">{motion_html}</div>
+      <div class="metric-grid">{motion_cards}</div>
+      <div class="metric-table-wrap">
+        <table class="metric-table">
+          <thead><tr><th>運動指標</th><th>顯示值</th><th>資料欄位</th></tr></thead>
+          <tbody>{_motion_metric_table(trajectory)}</tbody>
+        </table>
+      </div>
+      <div class="motion-note">橘色表示距離低於 {trajectory.spec.safe_clearance_m * 1000.0:.1f} mm 的教學警示；穿透超過 {trajectory.spec.collision_tolerance_m * 1000.0:.2f} mm 才以紅色計為碰撞。此階段使用幾何約束近似軟管形變，不計算材料剛性、摩擦、接觸力或慣性。</div>
+    </section>
+    """
+
+
 def write_simulation_report(
     scene_data: SceneData,
     result: RGBDSimulationResult,
     output_path: str | Path,
+    trajectory: TrajectoryData | None = None,
 ) -> Path:
-    """輸出包含原始世界、感測比較、條件與全部指標的單頁報告。"""
+    """輸出世界、感測比較與可選連續動作的單頁報告。"""
 
     destination = Path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -542,6 +703,12 @@ def write_simulation_report(
         )
         for label, value, class_name in key_metrics
     )
+    motion_section = _motion_section(scene_data, trajectory)
+    motion_resize = (
+        'Plotly.Plots.resize(document.getElementById("motion-view"));'
+        if trajectory is not None
+        else ""
+    )
     page_title = f"SimGrasp3D｜{spec.name}｜模擬驗證報告"
     document = f"""<!doctype html>
 <html lang="zh-Hant">
@@ -612,6 +779,7 @@ def write_simulation_report(
         </table>
       </div>
     </section>
+    {motion_section}
     <p class="report-note">此頁是模擬結果，不是實機驗證。較大的深度邊界誤差會同時包含外參偏移後不同表面落入同一像素的影響；目前的影像填充率也受離散表面點數影響。</p>
   </main>
   <script>
@@ -619,6 +787,7 @@ def write_simulation_report(
       window.setTimeout(function () {{
         Plotly.Plots.resize(document.getElementById("world-view"));
         Plotly.Plots.resize(document.getElementById("sensor-view"));
+        {motion_resize}
       }}, 80);
     }});
   </script>

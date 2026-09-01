@@ -15,6 +15,11 @@
 | 結構光 | [Zivid FAQ](https://support.zivid.com/en/latest/camera/support/faq.html) | 時序結構光與工業 3D 的代表用途/精度概念 |
 | 動態結構光 | [Photoneo MotionCam-3D](https://www.photoneo.com/kb/MC-M-GEN2) | 平行結構光、靜態與動態模式 |
 | 工程效能 | [Zivid ROI Production Preparation](https://support.zivid.com/en/latest/camera/academy/applications/piece-picking/prepare-for-production.html) | ROI 可降低擷取與下游處理成本 |
+| 軟管物理 | [MuJoCo Modeling — Composite Objects / Flex](https://mujoco.readthedocs.io/en/3.6.0/modeling.html) | cable、flex 與一維柔性物體的模型選項及限制 |
+| 高保真細長體 | [SOFA Supported Plugins — BeamAdapter](https://sofa-framework.github.io/doc/plugins/suported-plugins-list/) | Kirchhoff rod／beam 類細長柔性體插件定位 |
+| GPU 柔性體 | [Isaac Sim Physics](https://docs.isaacsim.omniverse.nvidia.com/latest/physics/index.html) | PhysX、deformable 與機器人物理模擬入口 |
+| 工業線纜規劃 | [Siemens Kineo Flexible Cables](https://www.siemens.com/en-us/products/plm-components/kineo/flexible-cables/) | 工業線纜路徑、干涉與數位驗證的代表性產品方向 |
+| 工業線纜模擬 | [Fraunhofer IPS Cable Simulation](https://www.itwm.fraunhofer.de/en/departments/mf/products-and-services/ips.html) | 工業裝配中的電纜／軟管模擬與驗證應用 |
 | 深度抓取 | [Dex-Net 2.0 Paper](https://goldberg.berkeley.edu/pubs/dex-net-2.0-Camera-Ready-RSS-2017.pdf) | depth-based grasp ranking、實機條件與原文成功率 |
 | 抓取 benchmark | [GraspNet-1Billion Paper](https://openaccess.thecvf.com/content_CVPR_2020/papers/Fang_GraspNet-1Billion_A_Large-Scale_Benchmark_for_General_Object_Grasping_CVPR_2020_paper.pdf) | 資料規模、RGB-D、6D pose/grasp 標註 |
 | 真實 RGB-D 資料 | [OCID 官方資料頁](https://www.acin.tuwien.ac.at/vision-for-robotics/software-tools/object-clutter-indoor-dataset/) | RGB、depth、2D label mask 與標註點雲內容 |

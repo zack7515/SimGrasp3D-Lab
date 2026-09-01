@@ -8,8 +8,11 @@ from pathlib import Path
 
 from simgrasp3d.io.rgbd_frame import export_rgbd_simulation
 from simgrasp3d.io.point_cloud import export_scene_point_clouds
+from simgrasp3d.io.trajectory import export_trajectory
 from simgrasp3d.scene.builder import build_scene, load_scene_spec
 from simgrasp3d.sensors.rgbd import simulate_rgbd
+from simgrasp3d.simulation.hose_motion import load_hose_motion_spec, simulate_hose_motion
+from simgrasp3d.visualization.motion_viewer import write_motion_html
 from simgrasp3d.visualization.plotly_viewer import write_scene_html
 from simgrasp3d.visualization.rgbd_viewer import write_rgbd_comparison_html
 from simgrasp3d.visualization.simulation_report import write_simulation_report
@@ -49,7 +52,25 @@ def build_parser() -> argparse.ArgumentParser:
         "--report-output",
         type=Path,
         default=Path("outputs/simulation_report.html"),
-        help="原始場景與感測結果的單頁雙畫面報告路徑",
+        help="原始場景、感測結果與連續動作的單頁報告路徑",
+    )
+    parser.add_argument(
+        "--motion-config",
+        type=Path,
+        default=Path("configs/motions/hose_extraction_demo.json"),
+        help="軟管連續動作 JSON 設定檔",
+    )
+    parser.add_argument(
+        "--motion-output",
+        type=Path,
+        default=Path("outputs/hose_motion.html"),
+        help="可離線播放的軟管連續動作 HTML 路徑",
+    )
+    parser.add_argument(
+        "--motion-output-dir",
+        type=Path,
+        default=Path("outputs/motion"),
+        help="逐幀軌跡 NPZ 與動作指標輸出目錄",
     )
     parser.add_argument(
         "--no-export-point-clouds",
@@ -60,6 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-simulate-rgbd",
         action="store_true",
         help="略過 RGB-D 投影與感測誤差模擬",
+    )
+    parser.add_argument(
+        "--no-simulate-motion",
+        action="store_true",
+        help="略過軟管夾取、避障與搬運時間序列",
     )
     parser.add_argument(
         "--open",
@@ -94,6 +120,29 @@ def main(argv: list[str] | None = None) -> int:
     if exported_count:
         print(f"PLY 點雲：{args.point_cloud_dir.resolve()}（{exported_count} 個檔案）")
 
+    motion_path: Path | None = None
+    motion_trajectory = None
+    if not args.no_simulate_motion:
+        motion_spec = load_hose_motion_spec(args.motion_config)
+        motion_trajectory = simulate_hose_motion(motion_spec, spec.robot)
+        motion_paths = export_trajectory(args.motion_output_dir, motion_trajectory)
+        motion_path = write_motion_html(
+            motion_trajectory,
+            spec.robot,
+            spec.table,
+            args.motion_output,
+        ).resolve()
+        motion_metrics = motion_trajectory.metrics
+        print(
+            "連續動作："
+            f"{motion_metrics['frame_count']} 幀 / {motion_metrics['duration_s']:.1f} s｜"
+            f"最大 IK 誤差={motion_metrics['maximum_ik_error_m'] * 1000.0:.2f} mm｜"
+            f"碰撞幀={motion_metrics['collision_frame_count']}｜"
+            f"安全警示幀={motion_metrics['unsafe_clearance_frame_count']}"
+        )
+        print(f"軟管動畫：{motion_path}")
+        print(f"逐幀軌跡：{motion_paths['trajectory'].resolve()}")
+
     report_path: Path | None = None
     if not args.no_simulate_rgbd:
         sensor_result = simulate_rgbd(scene_data)
@@ -106,6 +155,7 @@ def main(argv: list[str] | None = None) -> int:
             scene_data,
             sensor_result,
             args.report_output,
+            trajectory=motion_trajectory,
         ).resolve()
         metrics = sensor_result.metrics
         print(
@@ -119,7 +169,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"單頁驗證報告：{report_path}")
 
     if args.open:
-        browser_target = report_path if report_path is not None else html_path
+        browser_target = report_path or motion_path or html_path
         webbrowser.open(browser_target.as_uri())
     return 0
 

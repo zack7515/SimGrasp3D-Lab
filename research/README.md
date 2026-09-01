@@ -23,6 +23,44 @@ SimGrasp3D Lab 的目標不是宣稱已具備實機部署能力，而是建立�
 
 建議工具鏈為 ROS 2、MoveIt 2，以及 Gazebo 或 NVIDIA Isaac Sim；專案設計保持模擬器可替換，不讓 perception、grasping 與 planning 邏輯綁死於單一平台。
 
+## 建議起步順序與目前進度
+
+初學時不應先把感知、柔性物理、ROS 2 與大型模型同時接上。最容易驗證的順序，是先讓每一層都有可視化輸出、固定資料格式與量化門檻，再增加物理真實度：
+
+| 階段 | 先回答的問題 | 練習內容 | 驗收方式 | 狀態 |
+|---:|---|---|---|---|
+| 1 | 世界座標與尺寸是否正確？ | 桌面、物件、機械臂、相機、點雲與 FK | AABB、TCP、座標軸與固定 seed | 已完成第一版 |
+| 2 | 相機實際看見什麼？ | pinhole、z-buffer、RGB-D、雜訊、孔洞與外參誤差 | ground truth／observation 與深度 metrics | 已完成第一版 |
+| 3 | 動作資料是否連續、可達且可檢查？ | 軟管中心線、關鍵幀、位置型 IK、夾取附著、管路距離與動畫 | IK ≤ 2 mm、無穿透、管長誤差 < 1% | 已完成第一版 |
+| 4 | 路徑是否有充分安全餘量？ | TCP 姿態、完整夾爪／連桿幾何、swept volume、自動 waypoint 搜尋 | 消除目前 59 個低於 5 mm 的警示幀 | 下一步 |
+| 5 | 軟管接觸行為是否可信？ | MuJoCo cable/flex、重力、摩擦、彎曲、扭轉、夾持力與參數掃描 | 能量、穿透、拉伸、接觸力與 solver sensitivity | 待執行 |
+| 6 | 感知能否驅動同一管線？ | 真實 RGB-D adapter、桌面分割、物件點雲、抓取候選 | 公開資料 replay 與 domain-gap 指標 | 待執行 |
+| 7 | 是否接近真實控制架構？ | URDF/SRDF、MoveIt 2、ROS 2、模擬器與 fail-closed 狀態機 | 可重播 log、規劃成功率與失敗分類 | 待執行 |
+
+這個順序的核心理由是：物理引擎只能讓錯誤的座標、機構尺寸或路徑以更昂貴的方式失敗。先用幾何時間序列驗證 `TrajectoryFrame`，再讓 MuJoCo 產生同一份逐幀介面，較容易區分「資料／規劃錯誤」與「接觸物理錯誤」。
+
+### 已落地的軟管學習情境
+
+`configs/motions/hose_extraction_demo.json` 定義一根 49 節點軟管、三根固定管路、11 個動作關鍵幀與 5 mm 安全餘量。預設執行會產生 116 幀、9.6 秒的連續動作：
+
+```text
+待機 → 預抓取 → 下降 → 閉爪 → 抬升 → 繞管 → 抽離 → 搬運 → 放置 → 開爪 → 退回
+```
+
+目前通過的回歸門檻為：所有 IK 幀皆在 2 mm 內、穿透碰撞 0 幀、夾爪保守包覆體到管路至少 39.61 mm、軟管總長最大誤差 0.94%。仍有 59 幀低於 5 mm 安全餘量，代表軟管貼近管路；這是下一階段的路徑改善輸入，不應把「碰撞為零」誤讀為已具工業安全性。
+
+### 軟管物理引擎怎麼選
+
+| 路線 | 適合用途 | 優點 | 本專案使用時機 |
+|---|---|---|---|
+| 現有幾何約束 | 座標、資料 schema、動畫、IK 與近接警示 | Python 輕量、可解釋、無 GPU | 現在；不宣稱材料或接觸真實性 |
+| MuJoCo cable / flex | 即時接觸、摩擦、可延伸或近似不可延伸軟管 | 機器人整合直接、適合控制與參數掃描 | 下一個物理 baseline |
+| SOFA BeamAdapter | 細長柔性體、Kirchhoff rod、較高保真彎曲／扭轉 | 柔性體方法完整 | MuJoCo 無法符合目標形變時 |
+| Isaac Sim deformable / PhysX | GPU 場景、合成感測與 NVIDIA 生態 | 與 RTX 感測及大量場景整合方便 | 需要大量 domain randomization 時 |
+| Gazebo + MoveIt 2 | ROS 2 系統整合、控制器與規劃流程 | ROS 生態成熟 | 動作／感知介面穩定後 |
+
+真實 RGB-D 或點雲資料不能取代物理引擎：它能提供軟管初始形狀、遮擋與感測誤差，卻沒有「施力後下一時刻形狀」所需的材料、摩擦、接觸與邊界條件。反過來，物理引擎也不能取代真實資料；兩者應分別驗證 dynamics 與 perception，最後再做 sim-to-real 校正。
+
 ### 結果聲明規則
 
 - 本 repository 產生的抓取成功率、碰撞率、cycle time 與定位誤差，一律標示為 **simulation result**。
@@ -43,6 +81,8 @@ SimGrasp3D Lab 的目標不是宣稱已具備實機部署能力，而是建立�
 | `research/references/sources.md` | 官方文件、論文與 benchmark 來源 |
 | `CONTRIBUTING.md` | 公開協作、隱私與提交規則 |
 | `.githooks/` | 提交前的敏感資訊與 attribution 檢查 |
+| `configs/motions/hose_extraction_demo.json` | 軟管中心線、固定管路、動作關鍵幀與安全餘量 |
+| `outputs/motion/trajectory.npz` | 本機生成的逐幀 TCP、關節、軟管與距離資料，不提交 Git |
 
 ## 真實世界資料可以怎麼用
 
@@ -72,6 +112,9 @@ GraspNet 論文使用 Intel RealSense D435 與 Azure Kinect 同步擷取，以�
 - 依實際尺寸取樣的盒體、圓柱、球體與桌面表面點雲。
 - 具有六個旋轉關節，並可設定關節軸、角度、連桿位移、半徑及夾爪尺寸的簡化序列式機械手。
 - 正向運動學、世界/物件/相機/robot base/TCP 座標系。
+- 具有關節限制的阻尼最小平方位置型 IK。
+- 軟管固定節長、夾取附著、重力近似、固定管路投影與最小距離。
+- 116 幀連續抓取動畫、動作階段時間軸與 `TrajectoryData v1.0` NPZ。
 - 虛擬 RGB-D 相機位置、look-at 目標與視錐。
 - 可旋轉、縮放、切換圖層及讀取 XYZ 的自包含 Plotly HTML。
 - 每個物件、機械手部件與完整場景的 PLY 點雲輸出。
@@ -422,7 +465,8 @@ ToF 的實際誤差會受環境光、散射、溫度、多重反射及目標反�
 ```text
 simgrasp3d-lab/
 ├── configs/
-│   └── scenes/           # 場景、尺寸、姿態、相機與機械手設定
+│   ├── scenes/           # 場景、尺寸、姿態、相機與機械手設定
+│   └── motions/          # 軟管、固定管路、關鍵幀與安全餘量
 ├── research/
 │   ├── data/
 │   │   ├── camera_methods.csv
@@ -438,8 +482,10 @@ simgrasp3d-lab/
 │       ├── models/       # 場景設定資料模型
 │       ├── robot/        # 正向運動學與夾爪幾何
 │       ├── scene/        # 場景與相機視錐建立
-│       ├── io/           # PLY 點雲輸出
-│       └── visualization/# Plotly 互動式 3D 頁面
+│       ├── sensors/      # RGB-D 投影、z-buffer 與誤差模型
+│       ├── simulation/   # 軟管時間序列與幾何約束求解
+│       ├── io/           # PLY、RGB-D 與 trajectory 輸出
+│       └── visualization/# Plotly 場景、感測比較與動作動畫
 ├── scripts/              # 開發用執行入口
 ├── tests/                # 幾何、運動學、重現性與輸出測試
 └── outputs/              # 本機生成結果，不納入 Git

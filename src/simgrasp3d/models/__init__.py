@@ -10,6 +10,14 @@ from .specs import (
     SceneSpec,
     TableSpec,
 )
+from .motion import (
+    HoseMotionSpec,
+    HoseSpec,
+    MotionKeyframeSpec,
+    PipeObstacleSpec,
+    TrajectoryData,
+    TrajectoryFrame,
+)
 
 __all__ = [
     "CameraSpec",
@@ -20,5 +28,10 @@ __all__ = [
     "RobotSpec",
     "SceneSpec",
     "TableSpec",
+    "HoseMotionSpec",
+    "HoseSpec",
+    "MotionKeyframeSpec",
+    "PipeObstacleSpec",
+    "TrajectoryData",
+    "TrajectoryFrame",
 ]
-

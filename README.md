@@ -4,13 +4,15 @@
 
 作者：`zack7515`
 
-> 目前階段：幾何、點雲與 RGB-D 感測原型。尚未加入物理引擎、碰撞求解、逆向運動學或自動抓取策略，因此輸出不代表實機抓取結果。
+> 目前階段：幾何、點雲、RGB-D 感測與軟管運動學教學原型。已加入位置型 IK、關節限制、固定管路距離與連續動作；尚未加入接觸物理、摩擦、材料參數、末端姿態 IK 或自動抓取策略，因此輸出不代表實機抓取結果。
 
 ## 目前可以做什麼
 
 - 由 JSON 定義桌面、物件、六軸機械手、夾爪與虛擬 RGB-D 相機。
 - 依公尺尺寸產生盒體、圓柱、球體及機械手表面點雲。
 - 計算序列式機械手正向運動學與 TCP 世界座標。
+- 以阻尼最小平方位置型 IK 產生連續關節骨架，並驗證工作空間、關節限制與 TCP 誤差。
+- 模擬軟管夾取、抬升、繞管、搬運、放置與退回，逐幀檢查夾爪／軟管距離及約束品質。
 - 在瀏覽器中旋轉、縮放及切換物件、機械手、座標軸與相機視錐。
 - 將各實體與完整場景匯出為 ASCII PLY，供 Open3D、CloudCompare 等工具使用。
 - 以 pinhole 相機和 z-buffer 產生可見 RGB、深度、instance mask 與彩色點雲。
@@ -54,32 +56,38 @@ python scripts/run_scene.py
 
 ```text
 outputs/
-├── simulation_report.html    # 原始世界與感測結果的單頁雙畫面報告
+├── simulation_report.html    # 世界、RGB-D 與連續動作的單頁報告
 ├── tabletop_scene.html       # 可離線開啟的互動式 3D 場景
+├── hose_motion.html          # 可播放、暫停及逐幀拖曳的軟管動作動畫
 ├── point_clouds/
 │   ├── complete_scene.ply    # 合併後的完整場景點雲
 │   ├── blue_box.ply          # 個別物件點雲
 │   ├── orange_cylinder.ply
 │   ├── green_sphere.ply
 │   └── ...                   # 機械手各連桿、關節與夾爪點雲
-└── sensor/
-    ├── ground_truth_frame.npz     # 理想 RGB-D frame
-    ├── observation_frame.npz      # 含雜訊與孔洞的 RGB-D frame
-    ├── ground_truth_visible.ply   # 理想相機可見點雲
-    ├── observation_visible.ply    # 使用名義外參回投影的觀測點雲
-    ├── metrics.json               # 深度誤差、覆蓋率與外參擾動
-    └── rgbd_comparison.html       # RGB、深度與誤差互動比較頁面
+├── sensor/
+│   ├── ground_truth_frame.npz     # 理想 RGB-D frame
+│   ├── observation_frame.npz      # 含雜訊與孔洞的 RGB-D frame
+│   ├── ground_truth_visible.ply   # 理想相機可見點雲
+│   ├── observation_visible.ply    # 使用名義外參回投影的觀測點雲
+│   ├── metrics.json               # 深度誤差、覆蓋率與外參擾動
+│   └── rgbd_comparison.html       # RGB、深度與誤差互動比較頁面
+└── motion/
+    ├── trajectory.npz             # 逐幀 TCP、關節、軟管與距離資料
+    └── metrics.json               # IK、碰撞、安全餘量與約束摘要
 ```
 
 `outputs/` 是可重建產物，已由 Git 忽略，不會進入版本歷史。
 
-建議優先開啟 `outputs/simulation_report.html`。左側是原始 3D 世界，右側是同一場景的 RGB-D ground truth、observation、絕對誤差與 RGB；頁首會列出測試條件，頁面下方包含全部量化指標。執行 `simgrasp3d --open` 時只會開啟這份整合報告，不再彈出兩個分離頁面。
+建議優先開啟 `outputs/simulation_report.html`。A/B 雙畫面比較原始 3D 世界與 RGB-D ground truth／observation；C 區可播放軟管連續動作、拖曳時間軸並查看安全狀態，兩組完整量化指標都在同一頁。執行 `simgrasp3d --open` 時只會開啟這份整合報告。
 
 ## 專案結構
 
 ```text
 simgrasp3d-lab/
-├── configs/scenes/           # 場景、尺寸、姿態與相機設定
+├── configs/
+│   ├── scenes/               # 場景、尺寸、姿態與相機設定
+│   └── motions/              # 軟管、管路、關鍵幀與安全餘量設定
 ├── research/                 # 研究筆記、比較資料與來源索引
 │   ├── data/                 # 感測方案與研究比較表
 │   ├── references/           # 外部文件、論文及 benchmark 來源
@@ -92,6 +100,7 @@ simgrasp3d-lab/
 │   ├── robot/                # 機械手正向運動學與幾何建立
 │   ├── scene/                # 場景載入與組合
 │   ├── sensors/              # RGB-D 投影、z-buffer 與感測誤差
+│   ├── simulation/           # 軟管時間序列與幾何約束求解
 │   ├── visualization/        # Plotly 互動式 3D 視覺化
 │   └── cli.py                # `simgrasp3d` 命令列流程
 ├── tests/                    # 幾何、取樣、場景與匯出測試
@@ -105,17 +114,22 @@ simgrasp3d-lab/
 | 路徑 | 功能 | 修改時機 |
 |---|---|---|
 | `configs/scenes/tabletop_demo.json` | 定義場景單位、seed、桌面、物件、機械手、夾爪及相機 | 調整尺寸、姿態、關節角或點數時 |
+| `configs/motions/hose_extraction_demo.json` | 定義軟管中心線、固定管路、夾取節點、關鍵幀與安全餘量 | 練習不同抽取路徑或障礙配置時 |
 | `src/simgrasp3d/models/specs.py` | 將 JSON 轉成具型別的設定物件，並檢查尺寸、顏色、單位及必要欄位 | 新增場景欄位或物件種類時 |
+| `src/simgrasp3d/models/motion.py` | 定義軟管情境、關鍵幀、`TrajectoryFrame` 與 `TrajectoryData` | 擴充運動時間序列欄位時 |
 | `src/simgrasp3d/geometry/transforms.py` | 建立平移、旋轉、姿態矩陣，轉換點座標並對齊圓柱方向 | 擴充座標系或姿態運算時 |
 | `src/simgrasp3d/geometry/sampling.py` | 對盒體、圓柱與球體表面取樣，提供點雲容器與邊界計算 | 新增幾何形狀或取樣方法時 |
-| `src/simgrasp3d/robot/kinematics.py` | 計算各關節 frame、TCP，以及建立連桿、關節和夾爪點雲 | 修改機構模型或運動學時 |
+| `src/simgrasp3d/robot/kinematics.py` | 計算 FK、位置型 IK、各關節 frame、TCP 與機械手點雲 | 修改機構模型、關節限制或 IK 時 |
 | `src/simgrasp3d/scene/builder.py` | 載入設定、建立所有實體、相機座標與視錐，組成完整場景 | 加入感測、燈光或場景元素時 |
 | `src/simgrasp3d/sensors/rgbd.py` | 定義 `RGBDFrame`，執行投影、z-buffer、回投影及深度／外參誤差模擬 | 修改相機模型或真實資料轉接格式時 |
+| `src/simgrasp3d/simulation/hose_motion.py` | 產生軟管固定節長、附著、重力近似、障礙投影與逐幀距離 | 換路徑規劃器或物理求解器時 |
 | `src/simgrasp3d/visualization/plotly_viewer.py` | 建立互動式圖層、座標軸、hover 資訊與 HTML | 改善視覺呈現或除錯資訊時 |
 | `src/simgrasp3d/visualization/rgbd_viewer.py` | 比較理想深度、觀測深度、絕對誤差與 RGB | 分析感測品質時 |
-| `src/simgrasp3d/visualization/simulation_report.py` | 將原始 3D 世界、感測比較、測試條件與全部指標組成單頁雙畫面報告 | 調整整合報告資訊或版面時 |
+| `src/simgrasp3d/visualization/motion_viewer.py` | 建立播放、暫停、時間軸、安全狀態與動作階段 3D 動畫 | 調整連續動作教學畫面時 |
+| `src/simgrasp3d/visualization/simulation_report.py` | 將原始世界、感測比較、連續動作與全部指標組成單頁報告 | 調整整合報告資訊或版面時 |
 | `src/simgrasp3d/io/point_cloud.py` | 清理檔名並輸出個別或合併的 ASCII PLY | 支援 PCD、二進位 PLY 或其他格式時 |
 | `src/simgrasp3d/io/rgbd_frame.py` | 讀寫壓縮 NPZ、可見點雲及 JSON 模擬指標 | 匯入真實資料或擴充 schema 時 |
+| `src/simgrasp3d/io/trajectory.py` | 匯出不含 pickle 的逐幀 NPZ 與動作指標 JSON | 接入 notebook、物理引擎或資料分析時 |
 | `src/simgrasp3d/cli.py` | 串接設定載入、場景建立、HTML/PLY 輸出與瀏覽器開啟 | 新增命令列參數或工作流程時 |
 | `scripts/run_scene.py` | 尚未安裝 CLI 時的簡易執行入口 | 本機開發與快速除錯時 |
 | `tests/` | 驗證轉換矩陣、表面取樣、固定 seed、場景結構與 PLY 標頭 | 修改核心幾何或輸出邏輯後 |
@@ -140,8 +154,13 @@ flowchart LR
     J --> K[Observation RGB-D]
     I --> L[誤差指標與比較 HTML]
     K --> L
-    E --> M[單頁雙畫面驗證報告]
+    B --> N[軟管與動作關鍵幀]
+    N --> O[位置型 IK 與幾何約束]
+    O --> P[TrajectoryFrame 時間序列]
+    P --> Q[可播放 3D 動畫與 NPZ]
+    E --> M[單頁驗證報告]
     L --> M
+    Q --> M
 ```
 
 完整場景 PLY 仍是所有取樣表面的 ground truth；`outputs/sensor/` 則是經相機投影與 z-buffer 後的可見資料。第一版使用離散表面點投影，不是 mesh triangle rasterization，因此影像填充率會受 `point_count` 影響，不能把空白像素全都解讀成真實相機失效。
@@ -161,6 +180,26 @@ flowchart LR
 | `frame_id` | Unicode scalar | `ground_truth` 或 `observation` |
 
 光學相機採 OpenCV 慣例：x 向右、y 向下、z 向前。`observation` 的 `camera_to_world` 刻意保存系統認知的名義外參；實際擾動後的外參另存於 `metrics.json`，因此其回投影點雲能呈現校正誤差。
+
+### Motion trajectory v1.0
+
+`outputs/motion/trajectory.npz` 是目前幾何求解器與未來物理引擎共用的逐幀資料契約：
+
+| 欄位 | dtype / shape | 定義 |
+|---|---|---|
+| `time_s` | `float64 [T]` | 每幀模擬時間 |
+| `phase` | Unicode `[T]` | 待機、接近、夾取、抬升、避障、放置等階段 |
+| `tcp_position` | `float64 [T,3]` | 規劃的 TCP 世界座標 |
+| `joint_angles_deg` | `float64 [T,J]` | 位置型 IK 求得的關節角 |
+| `robot_joint_positions` | `float64 [T,J+1,3]` | 動畫用機械臂骨架 |
+| `gripper_opening_m` | `float64 [T]` | 平行夾爪開口 |
+| `attached` | `bool [T]` | 軟管夾取節點是否附著於 TCP |
+| `hose_nodes` | `float64 [T,N,3]` | 軟管中心線節點 |
+| `minimum_clearance_m` | `float64 [T]` | 軟管／夾爪至固定管路的最小外表面距離 |
+| `ik_position_error_m` | `float64 [T]` | TCP 目標與 FK 回算位置的誤差 |
+| `hose_length_ratio` | `float64 [T]` | 當前中心線總長相對初始總長 |
+
+第一版刻意只求 TCP **位置**，尚未約束夾爪朝向；夾爪碰撞採保守包覆球、軟管採離散節點與固定節長近似。後續接入物理引擎時應維持這些輸出欄位，額外增加接觸力、速度、材料參數與求解器資訊。
 
 ### 第一個固定測試情境
 
@@ -188,6 +227,26 @@ flowchart LR
 
 較大的邊界誤差同時包含外參偏移後「不同表面落到同一像素」的影響，不等同於相機軸向 noise standard deviation。完整數值以每次輸出的 `outputs/sensor/metrics.json` 為準。
 
+### 第二個固定測試情境：軟管抽取
+
+- 狀態：桌上軟管穿過三根固定管路附近，六軸手臂執行預抓取、下降、閉爪、抬升、繞管、抽離、搬運、放置與退回。
+- 輸入：49 個等弧長軟管中心線節點、11 個關鍵幀、12 Hz、5 mm 教學安全餘量。
+- 求解：阻尼最小平方位置型 IK；軟管使用固定節長、重力、夾取節點附著與圓柱障礙投影。
+- 目的：先驗證資料格式、座標、可達性、連續性與距離警示，再以相同 `TrajectoryData` 介面替換成接觸物理。
+
+目前固定結果：
+
+| 指標 | 結果 | 解讀 |
+|---|---:|---|
+| 動作長度 | 116 幀 / 9.6 s | 可播放及逐幀拖曳 |
+| 最大 IK 位置誤差 | 1.96 mm | 全部幀皆在 2 mm 容差內 |
+| 夾爪最小管路距離 | 39.61 mm | 保守包覆球未碰撞固定管路 |
+| 碰撞幀 | 0 | 0.25 mm 離散求解容差下無穿透 |
+| 低於 5 mm 安全餘量 | 59 幀 | 軟管貼近管路，動畫以橘色顯示，仍需改善路徑 |
+| 最大軟管長度誤差 | 0.94% | 幾何約束品質通過目前 1% 測試門檻 |
+
+安全警示不是錯誤隱藏，而是本練習要觀察的結果：**無穿透不等於路徑具有足夠安全餘量**。數值以 `outputs/motion/metrics.json` 為準。
+
 ## 調整場景
 
 預設設定位於 [`configs/scenes/tabletop_demo.json`](configs/scenes/tabletop_demo.json)。所有長度均使用公尺，姿態角使用度數：
@@ -196,6 +255,7 @@ flowchart LR
 - `pose.rpy_deg`：依 roll、pitch、yaw 定義姿態。
 - `dimensions` / `size`：物件或桌面的實際尺寸。
 - `joint_axis` / `joint_angle_deg`：旋轉關節軸與角度。
+- `joint_limits_deg`：IK 可使用的關節角下限與上限。
 - `translation`：目前關節旋轉後，到下一關節的局部位移。
 - `opening`：平行夾爪開口。
 - `point_count` / `points_per_link`：視覺化點數；越高越細緻，也越耗記憶體與瀏覽器效能。
@@ -206,6 +266,16 @@ flowchart LR
 - `camera.noise.dropout_probability`：有效深度被改成孔洞的機率。
 - `camera.noise.extrinsic_*`：相機平移與旋轉外參的標準差。
 
+連續動作位於 [`configs/motions/hose_extraction_demo.json`](configs/motions/hose_extraction_demo.json)：
+
+- `hose.control_points` / `node_count`：初始中心線與離散解析度。
+- `hose.grasp_node_index`：閉爪後附著於 TCP 的中心線節點。
+- `obstacles`：固定管路的起點、終點與半徑。
+- `keyframes`：每階段終點的 TCP、時間、夾爪開口與附著狀態。
+- `safe_clearance_m`：橘色近接警示門檻，不是碰撞容差。
+- `collision_tolerance_m`：離散約束的數值穿透容差；超過才計為碰撞。
+- `constraint_iterations`：越高越能維持管長，但 CPU 時間也越高；批次訓練不應產生 HTML。
+
 使用其他設定檔與輸出位置：
 
 ```bash
@@ -213,7 +283,9 @@ simgrasp3d \
   --config configs/scenes/tabletop_demo.json \
   --output outputs/custom_scene.html \
   --point-cloud-dir outputs/custom_clouds \
-  --report-output outputs/custom_report.html
+  --report-output outputs/custom_report.html \
+  --motion-config configs/motions/hose_extraction_demo.json \
+  --motion-output outputs/custom_motion.html
 ```
 
 只建立 HTML、不匯出 PLY：
@@ -226,6 +298,12 @@ simgrasp3d --no-export-point-clouds
 
 ```bash
 simgrasp3d --no-simulate-rgbd
+```
+
+只練習靜態場景與 RGB-D、略過連續動作：
+
+```bash
+simgrasp3d --no-simulate-motion
 ```
 
 查看所有參數：
@@ -246,12 +324,15 @@ pytest
 - 盒體、圓柱及球體表面取樣是否符合幾何邊界。
 - 固定 seed 的場景是否可重現。
 - 關節、連桿與 TCP 結構是否一致。
+- 位置型 IK 是否在關節限制內到達每幀 TCP。
+- 軟管夾取節點是否跟隨 TCP、總長誤差是否低於 1%。
+- 夾爪／軟管碰撞、5 mm 安全餘量警示與逐幀資料 shape。
 - 物件是否位於桌面上方。
 - PLY 匯出格式是否具有正確標頭。
 - z-buffer 是否保留同像素最近點，以及深度能否正確回投影。
 - 深度雜訊、量化、外參擾動是否固定 seed 重現。
 - `RGBDFrame` 壓縮 NPZ 是否能無損往返。
-- 單頁報告是否同時包含原始世界、感測畫面、測試情境與所有 metrics，且不依賴外部 script。
+- 單頁報告是否同時包含原始世界、感測畫面、連續動作與所有 metrics，且不依賴外部 script。
 
 ## 資料與文件
 
@@ -267,15 +348,17 @@ pytest
 
 ## 已知限制與開發順序
 
-目前已完成第一版相機投影、點式 z-buffer、深度／外參誤差、`RGBDFrame` 與比較指標。尚未包含 mesh rasterization、真實資料集 adapter、桌面分割、碰撞檢查、IK、路徑規劃、抓取候選、接觸物理及 ROS 2/模擬器整合。
+目前已完成第一版相機投影、點式 z-buffer、深度／外參誤差、`RGBDFrame`，以及軟管時間序列、位置型 IK、固定管路距離與簡化夾爪碰撞。尚未包含 mesh rasterization、真實資料集 adapter、桌面分割、末端姿態 IK、完整連桿 swept-volume 碰撞、自動路徑規劃、抓取候選、接觸物理及 ROS 2 整合。
 
 建議依下列順序擴充：
 
 1. **已完成第一版**：世界點投影、z-buffer、可見深度與 RGB-D 點雲。
 2. **已完成第一版**：深度量化、距離相關雜訊、孔洞、外參誤差與比較指標。
-3. 下一步：先為 `RGBDFrame` 實作桌面分割、物件點雲與 AABB，再加入 OBB、法向及抓取候選。
-4. 接著加入夾爪碰撞、工作空間、IK 與簡化路徑規劃。
-5. 最後依接觸精度與批次效能需求，評估 PyBullet、MuJoCo、Gazebo 或 Isaac Sim。
+3. **已完成第一版**：軟管幾何時間序列、關鍵幀狀態機、位置型 IK、關節限制、固定管路距離、簡化夾爪碰撞與動畫。
+4. 下一步：改善 59 個安全餘量警示幀，加入 TCP 姿態、完整連桿／夾爪幾何碰撞與自動 waypoint 搜尋。
+5. 接著以 MuJoCo 的一維 cable/flex 模型取代幾何約束，加入重力、摩擦、彎曲／扭轉、夾持接觸與 solver sensitivity 測試。
+6. 再為 `RGBDFrame` 實作桌面分割、物件點雲、AABB／OBB、法向與抓取候選，讓感知結果驅動相同動作管線。
+7. 最後視高精度柔性體、ROS 2 或大量合成資料需求，評估 SOFA、Gazebo 或 Isaac Sim，並接入真實資料 replay。
 
 大量場景訓練時，應將點雲、深度影像與 HTML 視覺化分流：訓練資料採批次及壓縮格式，HTML 僅用於抽樣檢查，避免不必要的 RAM/VRAM 與磁碟開銷。若未來部署到 Jetson，感知模型再依實測瓶頸評估 FP16、TensorRT 與點雲降採樣。
 
