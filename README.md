@@ -15,7 +15,7 @@
 - 將各實體與完整場景匯出為 ASCII PLY，供 Open3D、CloudCompare 等工具使用。
 - 使用固定 random seed 重現相同場景，並以測試驗證幾何與輸出行為。
 
-更完整的相機方案、工業作法、抓取管線、論文與決策分析請閱讀 [3D 機器人抓取學習筆記](LEARNING_NOTES.md)。
+更完整的相機方案、工業作法、抓取管線、論文與決策分析請閱讀 [研究與學習筆記](research/README.md)。
 
 ## 快速開始
 
@@ -68,8 +68,10 @@ outputs/
 ```text
 simgrasp3d-lab/
 ├── configs/scenes/           # 場景、尺寸、姿態與相機設定
-├── data/                     # 感測方案與研究比較表
-├── references/               # 外部文件、論文及 benchmark 來源
+├── research/                 # 研究筆記、比較資料與來源索引
+│   ├── data/                 # 感測方案與研究比較表
+│   ├── references/           # 外部文件、論文及 benchmark 來源
+│   └── README.md             # 3D 感知與機器人抓取研究筆記
 ├── scripts/                  # 開發用執行入口
 ├── src/simgrasp3d/
 │   ├── geometry/             # 幾何取樣與 3D 齊次座標轉換
@@ -81,7 +83,6 @@ simgrasp3d-lab/
 │   └── cli.py                # `simgrasp3d` 命令列流程
 ├── tests/                    # 幾何、取樣、場景與匯出測試
 ├── CONTRIBUTING.md           # 協作、隱私與提交規範
-├── LEARNING_NOTES.md         # 3D 感知與機器人抓取研究筆記
 ├── pyproject.toml            # 套件、相依套件與測試設定
 └── README.md                 # 專案入口與使用說明
 ```
@@ -101,8 +102,9 @@ simgrasp3d-lab/
 | `src/simgrasp3d/cli.py` | 串接設定載入、場景建立、HTML/PLY 輸出與瀏覽器開啟 | 新增命令列參數或工作流程時 |
 | `scripts/run_scene.py` | 尚未安裝 CLI 時的簡易執行入口 | 本機開發與快速除錯時 |
 | `tests/` | 驗證轉換矩陣、表面取樣、固定 seed、場景結構與 PLY 標頭 | 修改核心幾何或輸出邏輯後 |
-| `data/*.csv` | 保存相機方法、工程評分與公開實驗的可機讀資料 | 更新研究比較與證據時 |
-| `references/sources.md` | 保存官方文件與研究來源 | 新增或查核外部資料時 |
+| `research/README.md` | 彙整 3D 感知、抓取方法、工業實務與模擬規劃 | 閱讀或補充研究筆記時 |
+| `research/data/*.csv` | 保存相機方法、工程評分與公開實驗的可機讀資料 | 更新研究比較與證據時 |
+| `research/references/sources.md` | 保存官方文件與研究來源 | 新增或查核外部資料時 |
 
 ## 程式流程
 
@@ -172,11 +174,11 @@ pytest
 
 | 文件 | 內容 |
 |---|---|
-| [LEARNING_NOTES.md](LEARNING_NOTES.md) | 2D、RGB-D、工業 3D 相機、座標標定、抓取方法、工業實務、可行性與研究整理 |
-| [camera_methods.csv](data/camera_methods.csv) | 各類相機與感測方法的能力、限制和適用情境 |
-| [decision_matrix.csv](data/decision_matrix.csv) | 感測方案評分、權重與加權比較 |
-| [experiments.csv](data/experiments.csv) | 公開研究及實機實驗索引 |
-| [sources.md](references/sources.md) | 官方文件、論文與 benchmark 來源清單 |
+| [research/README.md](research/README.md) | 2D、RGB-D、工業 3D 相機、座標標定、抓取方法、工業實務、可行性與研究整理 |
+| [camera_methods.csv](research/data/camera_methods.csv) | 各類相機與感測方法的能力、限制和適用情境 |
+| [decision_matrix.csv](research/data/decision_matrix.csv) | 感測方案評分、權重與加權比較 |
+| [experiments.csv](research/data/experiments.csv) | 公開研究及實機實驗索引 |
+| [sources.md](research/references/sources.md) | 官方文件、論文與 benchmark 來源清單 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 公開協作、隱私、模擬結果與 commit 規範 |
 
 ## 已知限制與開發順序

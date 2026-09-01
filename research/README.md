@@ -34,12 +34,12 @@ SimGrasp3D Lab 的目標不是宣稱已具備實機部署能力，而是建立�
 
 | 路徑 | 用途 |
 |---|---|
-| `README.md` | 專案功能、目錄結構、安裝、執行與測試說明 |
-| `LEARNING_NOTES.md` | 技術調研、方案比較、模擬路線與實驗規劃 |
-| `data/camera_methods.csv` | 2D、RGB-D、3D 與混合感測方案比較 |
-| `data/decision_matrix.csv` | 工程決策權重與評分定義 |
-| `data/experiments.csv` | 已發表研究與實機實驗索引 |
-| `references/sources.md` | 官方文件、論文與 benchmark 來源 |
+| `README.md` | 根目錄的專案功能、安裝、執行與測試說明 |
+| `research/README.md` | 技術調研、方案比較、模擬路線與實驗規劃 |
+| `research/data/camera_methods.csv` | 2D、RGB-D、3D 與混合感測方案比較 |
+| `research/data/decision_matrix.csv` | 工程決策權重與評分定義 |
+| `research/data/experiments.csv` | 已發表研究與實機實驗索引 |
+| `research/references/sources.md` | 官方文件、論文與 benchmark 來源 |
 | `CONTRIBUTING.md` | 公開協作、隱私與提交規則 |
 | `.githooks/` | 提交前的敏感資訊與 attribution 檢查 |
 
@@ -95,7 +95,7 @@ outputs/point_clouds/
 
 ### 修改尺寸與姿態
 
-編輯 [`configs/scenes/tabletop_demo.json`](configs/scenes/tabletop_demo.json)：
+編輯 [`configs/scenes/tabletop_demo.json`](../configs/scenes/tabletop_demo.json)：
 
 - `dimensions`、`size`、`radius`、`opening` 的單位都是公尺。
 - `pose.xyz` 是物件中心在世界座標中的位置。
@@ -401,10 +401,14 @@ ToF 的實際誤差會受環境光、散射、溫度、多重反射及目標反�
 simgrasp3d-lab/
 ├── configs/
 │   └── scenes/           # 場景、尺寸、姿態、相機與機械手設定
-├── data/
-│   ├── camera_methods.csv
-│   ├── decision_matrix.csv
-│   └── experiments.csv
+├── research/
+│   ├── data/
+│   │   ├── camera_methods.csv
+│   │   ├── decision_matrix.csv
+│   │   └── experiments.csv
+│   ├── references/
+│   │   └── sources.md
+│   └── README.md         # 本研究與學習筆記
 ├── src/
 │   └── simgrasp3d/
 │       ├── geometry/     # 齊次轉換與表面點雲取樣

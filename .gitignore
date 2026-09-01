@@ -41,6 +41,9 @@ weights/
 data/raw/
 data/bags/
 data/cache/
+research/data/raw/
+research/data/bags/
+research/data/cache/
 *.ckpt
 *.onnx
 *.engine
