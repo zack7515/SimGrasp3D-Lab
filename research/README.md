@@ -39,9 +39,31 @@ SimGrasp3D Lab 的目標不是宣稱已具備實機部署能力，而是建立�
 | `research/data/camera_methods.csv` | 2D、RGB-D、3D 與混合感測方案比較 |
 | `research/data/decision_matrix.csv` | 工程決策權重與評分定義 |
 | `research/data/experiments.csv` | 已發表研究與實機實驗索引 |
+| `research/data/real_world_datasets.csv` | 可用真實 RGB-D／點雲資料集與適用測試 |
 | `research/references/sources.md` | 官方文件、論文與 benchmark 來源 |
 | `CONTRIBUTING.md` | 公開協作、隱私與提交規則 |
 | `.githooks/` | 提交前的敏感資訊與 attribution 檢查 |
+
+## 真實世界資料可以怎麼用
+
+可以，而且應該用來檢查 sim-to-real gap；但公開資料多半只能驗證「感知」，不能直接證明本專案機械手能安全抓取。
+
+| 資料集 | 真實內容 | 適合驗證 | 本階段建議 |
+|---|---|---|---|
+| GraspNet-1Billion | RealSense D435、Azure Kinect 的雜亂 RGB-D 場景與密集抓取標註 | 深度轉點雲、抓取候選、跨感測器差異 | **第一個真實資料轉接目標** |
+| OCID | RGB、depth、2D instance mask 與標註點雲 | 桌面／地面分割、雜亂物件 instance segmentation | 實作第 3 階段時使用 |
+| BOP YCB-V | 真實 RGB-D、3D 模型、6D pose、bbox 與 mask | 已知物件 pose、遮擋與 domain gap | 物件姿態路線使用 |
+| ClearGrasp | 透明物件的真實 RGB-D 與 ground-truth depth | 深度孔洞、透明材質與 depth completion | 困難材質壓力測試 |
+| YCB Object and Model Set | 真實物件 mesh、點雲與多視角 RGB-D | 以真實幾何取代盒、球與圓柱 | 場景資產擴充使用 |
+
+GraspNet 論文使用 Intel RealSense D435 與 Azure Kinect 同步擷取，以研究深度品質對抓取的影響；OCID 官方資料包含 RGB、深度、2D label mask 與 ground-truth annotated point cloud；BOP 的 YCB-V 提供真實影像、物件模型、mask 與 6D pose；ClearGrasp 則提供透明物件真實測試資料和 ground-truth geometry。來源與下載入口整理在 [`data/real_world_datasets.csv`](data/real_world_datasets.csv)。
+
+### 能驗證與不能驗證的邊界
+
+- 能驗證：資料讀取、深度單位、相機內參、深度孔洞率、點雲尺度、桌面分割、instance mask、6D pose 或 grasp proposal 指標。
+- 不能直接驗證：本專案機械手的 URDF 尺寸、手眼標定、IK 可達性、夾爪碰撞、摩擦、抓穩與搬運成功。
+- 公開資料的相機外參通常是該資料集座標，不是本專案 robot base；匯入時不可假設它等於 `T_base_camera`。
+- 真實資料應保留原始深度單位、invalid value、內參和 dataset license，再轉換為本專案的 `RGBDFrame`，不能只保存一份已處理點雲。
 
 ## 第一個可執行場景
 
@@ -60,7 +82,7 @@ SimGrasp3D Lab 的目標不是宣稱已具備實機部署能力，而是建立�
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+python -m pip install -r requirements.txt
 ```
 
 ### 產生場景
@@ -116,7 +138,7 @@ outputs/point_clouds/
 pytest
 ```
 
-第一版刻意不加入物理引擎、碰撞反應或抓取策略；它先建立可驗證的幾何與座標基礎。下一階段才會加入相機遮擋後的可見點雲、深度雜訊、碰撞檢查與抓取候選。
+目前已在幾何與座標基礎上加入第一版 pinhole 投影、z-buffer、可見 RGB-D 點雲、深度雜訊與外參偏移。下一階段會以相同 `RGBDFrame` 介面加入桌面分割、物件幾何與抓取候選；物理引擎、碰撞反應與 IK 仍刻意留在後續階段。
 
 ## 先說結論
 
@@ -405,7 +427,8 @@ simgrasp3d-lab/
 │   ├── data/
 │   │   ├── camera_methods.csv
 │   │   ├── decision_matrix.csv
-│   │   └── experiments.csv
+│   │   ├── experiments.csv
+│   │   └── real_world_datasets.csv
 │   ├── references/
 │   │   └── sources.md
 │   └── README.md         # 本研究與學習筆記

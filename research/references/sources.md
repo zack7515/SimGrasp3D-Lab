@@ -17,6 +17,10 @@
 | 工程效能 | [Zivid ROI Production Preparation](https://support.zivid.com/en/latest/camera/academy/applications/piece-picking/prepare-for-production.html) | ROI 可降低擷取與下游處理成本 |
 | 深度抓取 | [Dex-Net 2.0 Paper](https://goldberg.berkeley.edu/pubs/dex-net-2.0-Camera-Ready-RSS-2017.pdf) | depth-based grasp ranking、實機條件與原文成功率 |
 | 抓取 benchmark | [GraspNet-1Billion Paper](https://openaccess.thecvf.com/content_CVPR_2020/papers/Fang_GraspNet-1Billion_A_Large-Scale_Benchmark_for_General_Object_Grasping_CVPR_2020_paper.pdf) | 資料規模、RGB-D、6D pose/grasp 標註 |
+| 真實 RGB-D 資料 | [OCID 官方資料頁](https://www.acin.tuwien.ac.at/vision-for-robotics/software-tools/object-clutter-indoor-dataset/) | RGB、depth、2D label mask 與標註點雲內容 |
+| 真實 RGB-D / 6D pose | [BOP Datasets](https://bop.felk.cvut.cz/datasets/) | YCB-V 等資料的真實影像、物件模型、mask、6D pose 與授權 |
+| 透明物深度 | [ClearGrasp 官方 repository](https://github.com/Shreeyak/cleargrasp) | 真實／合成資料下載、ground-truth depth 與透明物件感測限制 |
+| 真實物件模型 | [YCB Object and Model Set](https://ycb-benchmarks.s3.amazonaws.com/index.html) | 物件 mesh、點雲、多視角 RGB/RGB-D 與資料授權 |
 | 6D grasp | [Contact-GraspNet](https://github.com/NVlabs/contact_graspnet) | raw point cloud 到 6-DoF grasp、硬體需求與 segmentation 建議 |
 | 7D grasp | [AnyGrasp Paper](https://arxiv.org/abs/2212.08333) | 靜態/動態 grasp、清箱與 picks/hour 實驗數字 |
 | RGB 6D pose | [MegaPose](https://megapose6d.github.io/) | novel CAD object 的 RGB pose estimation 與實機抓取流程 |

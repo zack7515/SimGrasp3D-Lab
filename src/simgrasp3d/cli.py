@@ -6,9 +6,12 @@ import argparse
 import webbrowser
 from pathlib import Path
 
+from simgrasp3d.io.rgbd_frame import export_rgbd_simulation
 from simgrasp3d.io.point_cloud import export_scene_point_clouds
 from simgrasp3d.scene.builder import build_scene, load_scene_spec
+from simgrasp3d.sensors.rgbd import simulate_rgbd
 from simgrasp3d.visualization.plotly_viewer import write_scene_html
+from simgrasp3d.visualization.rgbd_viewer import write_rgbd_comparison_html
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,9 +39,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="PLY 點雲輸出目錄",
     )
     parser.add_argument(
+        "--sensor-output-dir",
+        type=Path,
+        default=Path("outputs/sensor"),
+        help="RGB-D frame、可見點雲、比較頁面與指標輸出目錄",
+    )
+    parser.add_argument(
         "--no-export-point-clouds",
         action="store_true",
         help="只建立 HTML，不匯出 PLY",
+    )
+    parser.add_argument(
+        "--no-simulate-rgbd",
+        action="store_true",
+        help="略過 RGB-D 投影與感測誤差模擬",
     )
     parser.add_argument(
         "--open",
@@ -73,11 +87,30 @@ def main(argv: list[str] | None = None) -> int:
     if exported_count:
         print(f"PLY 點雲：{args.point_cloud_dir.resolve()}（{exported_count} 個檔案）")
 
+    comparison_path: Path | None = None
+    if not args.no_simulate_rgbd:
+        sensor_result = simulate_rgbd(scene_data)
+        sensor_paths = export_rgbd_simulation(args.sensor_output_dir, sensor_result)
+        comparison_path = write_rgbd_comparison_html(
+            sensor_result,
+            args.sensor_output_dir / "rgbd_comparison.html",
+        ).resolve()
+        metrics = sensor_result.metrics
+        print(
+            "RGB-D 誤差："
+            f"MAE={metrics['depth_mae_m'] * 1000.0:.2f} mm｜"
+            f"RMSE={metrics['depth_rmse_m'] * 1000.0:.2f} mm｜"
+            f"有效點={metrics['observation_valid_pixels']}"
+        )
+        print(f"RGB-D frame：{sensor_paths['observation_frame'].resolve()}")
+        print(f"RGB-D 比較：{comparison_path}")
+
     if args.open:
         webbrowser.open(html_path.as_uri())
+        if comparison_path is not None:
+            webbrowser.open(comparison_path.as_uri())
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

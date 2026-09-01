@@ -113,7 +113,17 @@
     "up": [0.0, 0.0, 1.0],
     "vertical_fov_deg": 52.0,
     "aspect_ratio": 1.3333333333,
+    "width": 160,
+    "height": 120,
     "near": 0.12,
-    "far": 1.75
+    "far": 1.75,
+    "noise": {
+      "depth_quantization_m": 0.001,
+      "axial_noise_std_base_m": 0.0004,
+      "axial_noise_std_per_m2": 0.0012,
+      "dropout_probability": 0.02,
+      "extrinsic_translation_std_m": 0.0015,
+      "extrinsic_rotation_std_deg": 0.12
+    }
   }
 }

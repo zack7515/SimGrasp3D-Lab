@@ -35,12 +35,12 @@ results/local/
 *.ulg
 
 # 大型模型與本機資料；正式發布時改用 Git LFS 或外部資料版本
-checkpoints/
-models/
-weights/
-data/raw/
-data/bags/
-data/cache/
+/checkpoints/
+/models/
+/weights/
+/data/raw/
+/data/bags/
+/data/cache/
 research/data/raw/
 research/data/bags/
 research/data/cache/

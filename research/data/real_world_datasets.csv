@@ -1,0 +1,6 @@
+資料集,資料型態,真實資料,主要標註,最適合本專案的測試,不涵蓋的範圍,官方來源
+GraspNet-1Billion,RGB-D與點雲,RealSense D435與Azure Kinect場景,密集6-DoF平行夾爪標註與相機資訊,真實深度轉點雲及抓取候選評估,不能驗證本專案機械手的實際碰撞與抓取成功,https://openaccess.thecvf.com/content_CVPR_2020/papers/Fang_GraspNet-1Billion_A_Large-Scale_Benchmark_for_General_Object_Grasping_CVPR_2020_paper.pdf
+OCID,RGB深度與點雲,室內桌面及地面雜亂場景,2D instance mask與標註點雲,桌面分割和物件點雲分離,沒有完整機器人軌跡與接觸力資料,https://www.acin.tuwien.ac.at/vision-for-robotics/software-tools/object-clutter-indoor-dataset/
+BOP YCB-V,RGB-D與物件模型,21種YCB物件的真實影片場景,6D pose與2D bounding box及mask,已知物件6D姿態與模擬真實域差距,不是直接抓取或運動規劃benchmark,https://bop.felk.cvut.cz/datasets/
+ClearGrasp,RGB-D與ground-truth depth,透明物件真實測試影像,深度與透明物件相關標註,深度孔洞及透明材質失效測試,場景專注透明物體且不是一般抓取資料集,https://github.com/Shreeyak/cleargrasp
+YCB Object and Model Set,3D mesh點雲與多視角RGB-D,真實物件掃描資料,物件模型與多視角影像,以真實物件幾何取代簡單盒球圓柱,單物件掃描不能代表雜亂抓取流程,https://ycb-benchmarks.s3.amazonaws.com/index.html
