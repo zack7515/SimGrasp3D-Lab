@@ -42,6 +42,81 @@ SimGrasp3D Lab 的目標不是宣稱已具備實機部署能力，而是建立�
 | `CONTRIBUTING.md` | 公開協作、隱私與提交規則 |
 | `.githooks/` | 提交前的敏感資訊與 attribution 檢查 |
 
+## 第一個可執行場景
+
+目前第一版 Python 原型已包含：
+
+- 依實際尺寸取樣的盒體、圓柱、球體與桌面表面點雲。
+- 可設定關節軸、角度、連桿位移、半徑及夾爪尺寸的簡化序列式機械手。
+- 正向運動學、世界/物件/相機/robot base/TCP 座標系。
+- 虛擬 RGB-D 相機位置、look-at 目標與視錐。
+- 可旋轉、縮放、切換圖層及讀取 XYZ 的自包含 Plotly HTML。
+- 每個物件、機械手部件與完整場景的 PLY 點雲輸出。
+
+### 安裝
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
+
+### 產生場景
+
+```bash
+simgrasp3d --open
+```
+
+若環境無法自動開啟瀏覽器：
+
+```bash
+simgrasp3d
+```
+
+完成後手動開啟：
+
+```text
+outputs/tabletop_scene.html
+```
+
+點雲會輸出至：
+
+```text
+outputs/point_clouds/
+├── blue_box.ply
+├── orange_cylinder.ply
+├── green_sphere.ply
+├── learning_arm_base.ply
+├── ...
+└── complete_scene.ply
+```
+
+### 修改尺寸與姿態
+
+編輯 [`configs/scenes/tabletop_demo.json`](configs/scenes/tabletop_demo.json)：
+
+- `dimensions`、`size`、`radius`、`opening` 的單位都是公尺。
+- `pose.xyz` 是物件中心在世界座標中的位置。
+- `pose.rpy_deg` 使用 roll、pitch、yaw 角度。
+- `joint_angle_deg` 修改機械手關節角。
+- `translation` 描述旋轉關節後，下一個關節在目前局部座標系中的位移。
+- `seed` 固定點雲取樣，使相同設定可完全重現。
+
+例如將藍色盒體改成 20 × 8 × 6 cm：
+
+```json
+"dimensions": [0.20, 0.08, 0.06]
+```
+
+### 執行測試
+
+```bash
+pytest
+```
+
+第一版刻意不加入物理引擎、碰撞反應或抓取策略；它先建立可驗證的幾何與座標基礎。下一階段才會加入相機遮擋後的可見點雲、深度雜訊、碰撞檢查與抓取候選。
+
 ## 先說結論
 
 1. **相機不會自動知道手臂尺寸。** 手臂連桿、關節限制、夾爪開口、TCP（工具中心點）、碰撞外形要由 URDF/SRDF、CAD、控制器與標定提供。MoveIt 使用 URDF/SRDF 的幾何與運動學模型進行自碰撞及環境碰撞檢查。[MoveIt URDF/SRDF 文件](https://moveit.picknik.ai/main/doc/examples/urdf_srdf/urdf_srdf_tutorial.html)
@@ -319,26 +394,27 @@ ToF 的實際誤差會受環境光、散射、溫度、多重反射及目標反�
 - **Jetson/邊緣端**：先選小型 segmentation + point-cloud grasp；FoundationPose/VLA 可放在工作站或透過本地網路服務。機器人停止、限速與碰撞保護必須在邊緣控制器本地完成。
 - **Docker**：固定 CUDA、TensorRT、ROS 2、相機 SDK 與模型版本；分成 `camera-driver`、`perception`、`planning`、`robot-driver` 容器，透過 ROS 2 topics/actions 連接，保存每版校正檔雜湊。
 
-## 建議專案結構
+## 專案結構
 
 ```text
-project_antigravity/
+simgrasp3d-lab/
 ├── configs/
-│   ├── cameras/          # 內參、深度尺度、曝光與 ROI
-│   ├── calibration/      # 手眼、TCP 與驗證結果
-│   └── planning/         # MoveIt、OctoMap、速度與安全邊界
+│   └── scenes/           # 場景、尺寸、姿態、相機與機械手設定
 ├── data/
-│   ├── bags/             # RGB、depth、point cloud、TF、joint states
-│   └── eval/             # 測試場景與成功/失敗標籤
+│   ├── camera_methods.csv
+│   ├── decision_matrix.csv
+│   └── experiments.csv
 ├── src/
-│   ├── perception/       # 分割、pose、depth completion
-│   ├── grasping/         # 候選生成、評分與碰撞過濾
-│   ├── robot_model/      # URDF/SRDF、夾爪與 TCP
-│   ├── planning/         # IK、軌跡、Servo 與狀態機
-│   └── safety/           # watchdog、資料新鮮度、fail-closed gates
-├── deploy/               # Docker、Jetson/工作站部署設定
-├── scripts/              # 標定、資料收集、評估與重播入口
-└── tests/                # 幾何單元測試、bag replay、hardware-in-loop
+│   └── simgrasp3d/
+│       ├── geometry/     # 齊次轉換與表面點雲取樣
+│       ├── models/       # 場景設定資料模型
+│       ├── robot/        # 正向運動學與夾爪幾何
+│       ├── scene/        # 場景與相機視錐建立
+│       ├── io/           # PLY 點雲輸出
+│       └── visualization/# Plotly 互動式 3D 頁面
+├── scripts/              # 開發用執行入口
+├── tests/                # 幾何、運動學、重現性與輸出測試
+└── outputs/              # 本機生成結果，不納入 Git
 ```
 
 ## 如何選擇
