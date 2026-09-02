@@ -1,6 +1,6 @@
 # 來源與證據索引
 
-> 查核日期：2026-09-01。優先使用官方文件、作者專案頁、正式論文與公開 benchmark。廠商資料只用來說明感測原理與代表性工程條件，不把單一廠商規格外推成所有產品表現。
+> 查核日期：2026-09-02。優先使用官方文件、作者專案頁、正式論文與公開 benchmark。廠商資料只用來說明感測原理與代表性工程條件，不把單一廠商規格外推成所有產品表現。
 
 | 分類 | 來源 | 本報告採用的主張 |
 |---|---|---|
@@ -16,6 +16,8 @@
 | 動態結構光 | [Photoneo MotionCam-3D](https://www.photoneo.com/kb/MC-M-GEN2) | 平行結構光、靜態與動態模式 |
 | 工程效能 | [Zivid ROI Production Preparation](https://support.zivid.com/en/latest/camera/academy/applications/piece-picking/prepare-for-production.html) | ROI 可降低擷取與下游處理成本 |
 | 軟管物理 | [MuJoCo Modeling — Composite Objects / Flex](https://mujoco.readthedocs.io/en/3.6.0/modeling.html) | cable、flex 與一維柔性物體的模型選項及限制 |
+| MuJoCo Python | [MuJoCo Python Bindings](https://mujoco.readthedocs.io/en/stable/python.html) | 官方 `mujoco` 套件、模型載入與無視窗步進介面 |
+| MuJoCo cable | [Official Elasticity Cable Model](https://github.com/google-deepmind/mujoco/blob/main/model/plugin/elasticity/cable.xml) | `mujoco.elasticity.cable` 插件與 composite cable 設定範例 |
 | 高保真細長體 | [SOFA Supported Plugins — BeamAdapter](https://sofa-framework.github.io/doc/plugins/suported-plugins-list/) | Kirchhoff rod／beam 類細長柔性體插件定位 |
 | GPU 柔性體 | [Isaac Sim Physics](https://docs.isaacsim.omniverse.nvidia.com/latest/physics/index.html) | PhysX、deformable 與機器人物理模擬入口 |
 | 工業線纜規劃 | [Siemens Kineo Flexible Cables](https://www.siemens.com/en-us/products/plm-components/kineo/flexible-cables/) | 工業線纜路徑、干涉與數位驗證的代表性產品方向 |

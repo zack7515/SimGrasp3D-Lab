@@ -1,0 +1,11 @@
+{
+  "maximum_ik_position_error_m": 0.002,
+  "maximum_ik_orientation_error_deg": 1.0,
+  "minimum_robot_clearance_m": 0.005,
+  "maximum_unresolved_path_segments": 0,
+  "maximum_hose_penetration_frames": 1,
+  "maximum_sampled_contact_force_n": 30.0,
+  "maximum_grasp_constraint_error_m": 0.015,
+  "maximum_table_height_error_m": 0.005,
+  "require_feasible_grasp": true
+}

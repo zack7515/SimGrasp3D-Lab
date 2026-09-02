@@ -8,10 +8,15 @@ from pathlib import Path
 from plotly.io import to_html
 from plotly.offline import get_plotlyjs
 
+from simgrasp3d.models.integration import ReplayResult
 from simgrasp3d.models.motion import TrajectoryData
+from simgrasp3d.models.perception import PerceptionResult
+from simgrasp3d.models.physics import PhysicsSweepData
 from simgrasp3d.scene.builder import SceneData
 from simgrasp3d.sensors.rgbd import RGBDSimulationResult
 from simgrasp3d.visualization.motion_viewer import build_motion_figure
+from simgrasp3d.visualization.perception_viewer import build_perception_figure
+from simgrasp3d.visualization.physics_viewer import build_physics_comparison_figure
 from simgrasp3d.visualization.plotly_viewer import build_figure
 from simgrasp3d.visualization.rgbd_viewer import build_rgbd_comparison_figure
 
@@ -374,11 +379,13 @@ main {
   line-height: 1.6;
 }
 
-.motion-section {
+.motion-section,
+.analysis-section {
   margin-top: 14px;
 }
 
-.motion-section .pane-code { background: var(--cyan); }
+.motion-section .pane-code,
+.analysis-section .pane-code { background: var(--cyan); }
 
 .phase-rail {
   display: grid;
@@ -544,6 +551,17 @@ def _motion_metric_table(trajectory: TrajectoryData) -> str:
         "planned_keyframe_count": "規劃後關鍵幀數",
         "inserted_waypoint_count": "自動插入 waypoint 數",
         "unresolved_path_segment_count": "未解決路徑線段數",
+        "physics_step_count": "MuJoCo 步進數",
+        "maximum_physics_contact_count": "單幀環境接觸數",
+        "maximum_contact_force_n": "抽樣最大環境接觸力",
+        "minimum_contact_distance_m": "最深環境接觸距離",
+        "maximum_physics_self_contact_count": "單幀自接觸數",
+        "maximum_self_contact_force_n": "抽樣最大自接觸力",
+        "minimum_self_contact_distance_m": "最深自接觸距離",
+        "maximum_grasp_constraint_error_m": "最大抓持約束誤差",
+        "maximum_hose_speed_m_s": "輸出幀最大節點速度",
+        "maximum_total_energy_j": "最大總能量",
+        "physics_nonfinite_frame_count": "非有限值幀數",
     }
     rows = []
     for key, value in trajectory.metrics.items():
@@ -553,6 +571,12 @@ def _motion_metric_table(trajectory: TrajectoryData) -> str:
             display = f"{float(value):.3f}°"
         elif key.endswith("_ratio"):
             display = f"{float(value) * 100.0:.3f}%"
+        elif key.endswith("_n"):
+            display = f"{float(value):.3f} N"
+        elif key.endswith("_j"):
+            display = f"{float(value):.5f} J"
+        elif key.endswith("_m_s"):
+            display = f"{float(value):.3f} m/s"
         elif key == "duration_s":
             display = f"{float(value):.2f} s"
         else:
@@ -596,6 +620,13 @@ def _motion_section(
         for index, phase in enumerate(phases, start=1)
     )
     metrics = trajectory.metrics
+    engine_label = trajectory.physics_engine or "幾何運動學"
+    section_badge = "PHYSICS REPLAY" if trajectory.physics_engine else "KINEMATIC LEARNING"
+    subtitle = (
+        "MuJoCo cable、接觸力、能量、機器人尺寸碰撞與 TCP 重播"
+        if trajectory.physics_engine
+        else "六自由度 IK、機器人尺寸碰撞、軟管接觸與自動 waypoint"
+    )
     motion_cards = "".join(
         (
             f'<div class="metric {class_name}">'
@@ -615,8 +646,8 @@ def _motion_section(
     return f"""
     <section class="pane motion-section" aria-label="軟管夾取連續動作動畫">
       <header class="pane-header">
-        <div class="pane-title"><span class="pane-code">C</span><div><h2>軟管抽取與搬運時間序列</h2><p>六自由度 IK、機器人尺寸碰撞、軟管接觸與自動 waypoint</p></div></div>
-        <span class="pane-badge">KINEMATIC LEARNING</span>
+        <div class="pane-title"><span class="pane-code">C</span><div><h2>軟管抽取與搬運時間序列</h2><p>{escape(subtitle)}</p></div></div>
+        <span class="pane-badge">{section_badge}</span>
       </header>
       <div class="phase-rail" aria-label="動作階段">{phase_rail}</div>
       <div class="motion-plot">{motion_html}</div>
@@ -627,7 +658,239 @@ def _motion_section(
           <tbody>{_motion_metric_table(trajectory)}</tbody>
         </table>
       </div>
-      <div class="motion-note">TCP 橘／紅色代表機器人低於 {trajectory.spec.safe_clearance_m * 1000.0:.1f} mm 或穿透；軟管節點橘色則表示與管路進入 1 mm 接觸帶，兩者分開統計。規劃器插入的 waypoint 以橘色路徑節點顯示。此階段仍不計算材料剛性、摩擦、接觸力或慣性。</div>
+      <div class="motion-note">資料來源：{escape(engine_label)}。TCP 橘／紅色代表機器人低於 {trajectory.spec.safe_clearance_m * 1000.0:.1f} mm 或穿透；軟管節點橘色表示與管路進入 1 mm 接觸帶。規劃器插入的 waypoint 以橘色路徑節點顯示。</div>
+    </section>
+    """
+
+
+def _analysis_metric_rows(
+    metrics: dict[str, float | int],
+    labels: dict[str, str],
+) -> str:
+    """建立物理、感知與整合區共用的完整指標列。"""
+
+    rows = []
+    for key, value in metrics.items():
+        if key.endswith("_m"):
+            display = f"{float(value) * 1000.0:.3f} mm"
+        elif key.endswith("_deg"):
+            display = f"{float(value):.3f}°"
+        elif key.endswith("_ratio"):
+            display = f"{float(value) * 100.0:.3f}%"
+        elif key.endswith("_n"):
+            display = f"{float(value):.3f} N"
+        elif key.endswith("_j"):
+            display = f"{float(value):.5f} J"
+        elif key.endswith("_m_s"):
+            display = f"{float(value):.3f} m/s"
+        elif key.endswith("_s"):
+            display = f"{float(value):.3f} s"
+        else:
+            display = f"{int(value):,}" if isinstance(value, int) else f"{float(value):.6f}"
+        rows.append(
+            "<tr>"
+            f'<th scope="row">{escape(labels.get(key, key))}</th>'
+            f"<td>{escape(display)}</td>"
+            f"<td>{escape(key)}</td>"
+            "</tr>"
+        )
+    return "".join(rows)
+
+
+def _physics_section(
+    kinematic: TrajectoryData | None,
+    sweep: PhysicsSweepData | None,
+) -> str:
+    """建立 MuJoCo baseline、接觸物理與敏感度比較區。"""
+
+    if kinematic is None or sweep is None:
+        return ""
+    figure = build_physics_comparison_figure(kinematic, sweep)
+    physics_html = to_html(
+        figure,
+        include_plotlyjs=False,
+        full_html=False,
+        div_id="physics-view",
+        config={"displaylogo": False, "responsive": True, "scrollZoom": True},
+    )
+    metrics = sweep.baseline.metrics
+    cards = "".join(
+        (
+            f'<div class="metric {class_name}">'
+            f'<span class="metric-label">{escape(label)}</span>'
+            f'<span class="metric-value">{escape(value)}</span>'
+            "</div>"
+        )
+        for label, value, class_name in (
+            ("ENGINE", sweep.engine_version, "accent"),
+            ("PHYSICS STEPS", f"{int(metrics['physics_step_count']):,}", ""),
+            ("SAMPLED FORCE", f"{float(metrics['maximum_contact_force_n']):.2f} N", "warning"),
+            ("GRASP LAG", f"{float(metrics['maximum_grasp_constraint_error_m']) * 1000.0:.2f} mm", "warning"),
+            ("LENGTH ERROR", f"{float(metrics['maximum_hose_length_error_ratio']) * 100.0:.5f}%", "accent"),
+            ("PENETRATION", f"{int(metrics['hose_penetration_frame_count'])}", "warning"),
+        )
+    )
+    case_rows = "".join(
+        "<tr>"
+        f'<th scope="row">{escape(case.name)}</th>'
+        f"<td>{case.parameters['timestep_s'] * 1000.0:.1f} ms</td>"
+        f"<td>{case.parameters['bend_pa'] / 1.0e6:.2f} MPa</td>"
+        f"<td>{case.parameters['friction']:.2f}</td>"
+        f"<td>{float(case.metrics['final_shape_rms_delta_m']) * 1000.0:.2f} mm</td>"
+        f"<td>{float(case.metrics['maximum_contact_force_n']):.2f} N</td>"
+        "</tr>"
+        for case in sweep.cases
+    )
+    labels = {
+        "physics_step_count": "物理步進數",
+        "maximum_physics_contact_count": "單幀環境接觸數",
+        "maximum_contact_force_n": "抽樣最大環境接觸力",
+        "minimum_contact_distance_m": "MuJoCo 最深環境接觸距離",
+        "maximum_physics_self_contact_count": "單幀自接觸數",
+        "maximum_self_contact_force_n": "抽樣最大自接觸力",
+        "minimum_self_contact_distance_m": "最深自接觸距離",
+        "maximum_grasp_constraint_error_m": "最大抓持約束誤差",
+        "maximum_hose_speed_m_s": "輸出幀最大節點速度",
+        "maximum_total_energy_j": "最大總能量",
+        "physics_nonfinite_frame_count": "非有限值幀數",
+    }
+    physics_only_metrics = {
+        key: value
+        for key, value in metrics.items()
+        if key.startswith(("physics_", "maximum_physics", "maximum_contact", "minimum_contact", "maximum_self", "minimum_self", "maximum_grasp", "maximum_total"))
+        or key == "maximum_hose_speed_m_s"
+    }
+    return f"""
+    <section class="pane analysis-section" aria-label="MuJoCo 軟管物理與敏感度">
+      <header class="pane-header">
+        <div class="pane-title"><span class="pane-code">D</span><div><h2>MuJoCo 軟管接觸物理</h2><p>cable 彎曲／扭轉、摩擦、接觸力、能量與 solver sensitivity</p></div></div>
+        <span class="pane-badge">PHYSICS BASELINE</span>
+      </header>
+      <div class="motion-plot">{physics_html}</div>
+      <div class="metric-grid">{cards}</div>
+      <div class="metric-table-wrap">
+        <table class="metric-table"><thead><tr><th>物理指標</th><th>顯示值</th><th>資料欄位</th></tr></thead>
+        <tbody>{_analysis_metric_rows(physics_only_metrics, labels)}</tbody></table>
+      </div>
+      <div class="metric-table-wrap">
+        <table class="metric-table"><thead><tr><th>敏感度案例</th><th>步長</th><th>彎曲參數</th><th>摩擦</th><th>最終形狀差</th><th>抽樣接觸力</th></tr></thead>
+        <tbody>{case_rows}</tbody></table>
+      </div>
+      <div class="motion-note">接觸力只在 12 Hz 輸出幀抽樣；材料參數尚未由真實軟管校正。自接觸在此 baseline 關閉，避免相鄰 capsule 重疊造成假力。</div>
+    </section>
+    """
+
+
+def _perception_section(
+    sensor_result: RGBDSimulationResult,
+    perception: PerceptionResult | None,
+) -> str:
+    """建立桌面、OBB、法向與抓取候選區。"""
+
+    if perception is None:
+        return ""
+    figure = build_perception_figure(sensor_result.observation, perception)
+    perception_html = to_html(
+        figure,
+        include_plotlyjs=False,
+        full_html=False,
+        div_id="perception-view",
+        config={"displaylogo": False, "responsive": True, "scrollZoom": True},
+    )
+    metrics = perception.metrics
+    cards = "".join(
+        (
+            f'<div class="metric {class_name}">'
+            f'<span class="metric-label">{escape(label)}</span>'
+            f'<span class="metric-value">{escape(value)}</span>'
+            "</div>"
+        )
+        for label, value, class_name in (
+            ("TABLE RMS", f"{float(metrics['table_plane_rms_error_m']) * 1000.0:.2f} mm", "warning"),
+            ("TABLE HEIGHT", f"{float(metrics['table_height_error_m']) * 1000.0:+.2f} mm", ""),
+            ("TABLE TILT", f"{float(metrics['table_tilt_error_deg']):.2f}°", "accent"),
+            ("OBJECTS", f"{int(metrics['detected_object_count'])}", "accent"),
+            ("GRASPS", f"{int(metrics['grasp_candidate_count'])}", ""),
+            ("FEASIBLE", f"{int(metrics['feasible_grasp_candidate_count'])}", "accent"),
+        )
+    )
+    labels = {
+        "valid_point_count": "Observation 有效點",
+        "table_inlier_count": "桌面內點數",
+        "table_inlier_ratio": "桌面內點比例",
+        "table_plane_rms_error_m": "桌面平面 RMS",
+        "table_tilt_error_deg": "桌面傾角誤差",
+        "table_height_error_m": "桌面高度誤差",
+        "detected_object_count": "物件數",
+        "grasp_candidate_count": "抓取候選數",
+        "feasible_grasp_candidate_count": "幾何可行候選數",
+    }
+    return f"""
+    <section class="pane analysis-section" aria-label="RGB-D 幾何與抓取候選">
+      <header class="pane-header">
+        <div class="pane-title"><span class="pane-code">E</span><div><h2>RGB-D 幾何與抓取候選</h2><p>RANSAC 桌面、oracle instance baseline、AABB／OBB、法向與 top-down grasp</p></div></div>
+        <span class="pane-badge">PERCEPTION BASELINE</span>
+      </header>
+      <div class="motion-plot">{perception_html}</div>
+      <div class="metric-grid">{cards}</div>
+      <div class="metric-table-wrap"><table class="metric-table">
+        <thead><tr><th>感知指標</th><th>顯示值</th><th>資料欄位</th></tr></thead>
+        <tbody>{_analysis_metric_rows(metrics, labels)}</tbody></table></div>
+      <div class="motion-note">物件分割目前使用模擬 instance mask 作為 oracle baseline；桌面、包圍盒、法向與抓取幾何則由含雜訊 observation 計算，尚未宣稱未知物件分割能力。</div>
+    </section>
+    """
+
+
+def _integration_section(replay: ReplayResult | None) -> str:
+    """建立 fail-closed 安全閘門與控制重播摘要區。"""
+
+    if replay is None:
+        return ""
+    status = "AUTHORIZED" if replay.execution_authorized else "ABORTED"
+    status_class = "accent" if replay.execution_authorized else "warning"
+    selected_name = (
+        "NONE"
+        if replay.selected_grasp is None
+        else replay.selected_grasp.candidate.object_name
+    )
+    cards = "".join(
+        (
+            f'<div class="metric {class_name}">'
+            f'<span class="metric-label">{escape(label)}</span>'
+            f'<span class="metric-value">{escape(value)}</span>'
+            "</div>"
+        )
+        for label, value, class_name in (
+            ("EXECUTION", status, status_class),
+            ("FAILURES", f"{len(replay.failure_codes)}", status_class),
+            ("SELECTED", selected_name, ""),
+            ("EVENTS", f"{len(replay.events)}", ""),
+            ("COMMANDS", f"{int(replay.metrics['command_frame_count'])}", "accent"),
+            ("DURATION", f"{float(replay.metrics['replay_duration_s']):.1f} s", ""),
+        )
+    )
+    failure_text = "PASS — 全部安全閘門通過" if not replay.failure_codes else "、".join(replay.failure_codes)
+    labels = {
+        "execution_authorized": "允許執行",
+        "failure_count": "失敗分類數",
+        "event_count": "事件數",
+        "command_frame_count": "控制命令幀數",
+        "replay_duration_s": "重播時間",
+        "validated_grasp_count": "完成 IK／碰撞驗證的抓取數",
+        "selected_grasp_score": "選定抓取分數",
+        "selected_grasp_clearance_m": "選定抓取最小距離",
+    }
+    return f"""
+    <section class="pane analysis-section" aria-label="安全閘門與控制重播">
+      <header class="pane-header">
+        <div class="pane-title"><span class="pane-code">F</span><div><h2>Fail-closed 規劃與控制重播</h2><p>感知候選 → IK → 碰撞 → 物理門檻 → JSONL 命令事件</p></div></div>
+        <span class="pane-badge">{status}</span>
+      </header>
+      <div class="metric-grid">{cards}</div>
+      <div class="metric-table-wrap"><table class="metric-table">
+        <thead><tr><th>整合指標</th><th>顯示值</th><th>資料欄位</th></tr></thead>
+        <tbody>{_analysis_metric_rows(replay.metrics, labels)}</tbody></table></div>
+      <div class="motion-note">安全閘門：{escape(failure_text)}。此 JSONL 是 message-neutral 離線重播，不會連線或命令真實機器；URDF／SRDF 僅含目前簡化幾何，接入 ROS 2／MoveIt 前仍需控制器與實機安全設定。</div>
     </section>
     """
 
@@ -637,8 +900,11 @@ def write_simulation_report(
     result: RGBDSimulationResult,
     output_path: str | Path,
     trajectory: TrajectoryData | None = None,
+    physics_sweep: PhysicsSweepData | None = None,
+    perception: PerceptionResult | None = None,
+    replay: ReplayResult | None = None,
 ) -> Path:
-    """輸出世界、感測比較與可選連續動作的單頁報告。"""
+    """輸出世界、感測、動作、物理、感知與安全整合的單頁報告。"""
 
     destination = Path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -713,10 +979,26 @@ def write_simulation_report(
         )
         for label, value, class_name in key_metrics
     )
-    motion_section = _motion_section(scene_data, trajectory)
+    displayed_trajectory = (
+        physics_sweep.baseline if physics_sweep is not None else trajectory
+    )
+    motion_section = _motion_section(scene_data, displayed_trajectory)
+    physics_section = _physics_section(trajectory, physics_sweep)
+    perception_section = _perception_section(result, perception)
+    integration_section = _integration_section(replay)
     motion_resize = (
         'Plotly.Plots.resize(document.getElementById("motion-view"));'
-        if trajectory is not None
+        if displayed_trajectory is not None
+        else ""
+    )
+    physics_resize = (
+        'Plotly.Plots.resize(document.getElementById("physics-view"));'
+        if trajectory is not None and physics_sweep is not None
+        else ""
+    )
+    perception_resize = (
+        'Plotly.Plots.resize(document.getElementById("perception-view"));'
+        if perception is not None
         else ""
     )
     page_title = f"SimGrasp3D｜{spec.name}｜模擬驗證報告"
@@ -734,7 +1016,7 @@ def write_simulation_report(
     <div class="instrument-grid">
       <div>
         <p class="eyebrow">SimGrasp3D / simulation validation</p>
-        <h1>世界座標 vs. RGB-D 觀測</h1>
+        <h1>世界、感知、物理與控制驗證</h1>
       </div>
       <div class="run-state" aria-label="執行識別">
         <div class="state-cell"><span class="meta-label">Scene</span><span class="meta-value">{escape(spec.name)}</span></div>
@@ -790,6 +1072,9 @@ def write_simulation_report(
       </div>
     </section>
     {motion_section}
+    {physics_section}
+    {perception_section}
+    {integration_section}
     <p class="report-note">此頁是模擬結果，不是實機驗證。較大的深度邊界誤差會同時包含外參偏移後不同表面落入同一像素的影響；目前的影像填充率也受離散表面點數影響。</p>
   </main>
   <script>
@@ -798,6 +1083,8 @@ def write_simulation_report(
         Plotly.Plots.resize(document.getElementById("world-view"));
         Plotly.Plots.resize(document.getElementById("sensor-view"));
         {motion_resize}
+        {physics_resize}
+        {perception_resize}
       }}, 80);
     }});
   </script>

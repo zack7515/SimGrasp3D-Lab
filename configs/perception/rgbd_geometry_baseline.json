@@ -1,0 +1,13 @@
+{
+  "random_seed": 7515,
+  "plane_ransac_iterations": 300,
+  "plane_distance_threshold_m": 0.008,
+  "maximum_table_tilt_deg": 20.0,
+  "minimum_object_points": 24,
+  "normal_neighbor_count": 16,
+  "maximum_normal_samples": 96,
+  "bounding_box_trim_quantile": 0.02,
+  "maximum_gripper_opening_m": 0.11,
+  "grasp_width_margin_m": 0.01,
+  "pregrasp_distance_m": 0.08
+}

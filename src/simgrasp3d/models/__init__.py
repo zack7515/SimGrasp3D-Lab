@@ -19,6 +19,26 @@ from .motion import (
     TrajectoryFrame,
     WaypointPlannerSpec,
 )
+from .physics import (
+    MujocoHoseSpec,
+    PhysicsSweepCase,
+    PhysicsSweepData,
+    PhysicsVariantSpec,
+)
+from .perception import (
+    BoundingBox3D,
+    GraspCandidate,
+    ObjectGeometry,
+    PerceptionResult,
+    PerceptionSpec,
+    PlaneEstimate,
+)
+from .integration import (
+    IntegrationSpec,
+    ReplayEvent,
+    ReplayResult,
+    ValidatedGrasp,
+)
 
 __all__ = [
     "CameraSpec",
@@ -36,4 +56,18 @@ __all__ = [
     "TrajectoryData",
     "TrajectoryFrame",
     "WaypointPlannerSpec",
+    "MujocoHoseSpec",
+    "PhysicsSweepCase",
+    "PhysicsSweepData",
+    "PhysicsVariantSpec",
+    "BoundingBox3D",
+    "GraspCandidate",
+    "ObjectGeometry",
+    "PerceptionResult",
+    "PerceptionSpec",
+    "PlaneEstimate",
+    "IntegrationSpec",
+    "ReplayEvent",
+    "ReplayResult",
+    "ValidatedGrasp",
 ]

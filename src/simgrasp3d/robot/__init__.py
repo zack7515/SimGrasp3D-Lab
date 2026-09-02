@@ -14,6 +14,7 @@ from .kinematics import (
     solve_pose_ik,
     solve_position_ik,
 )
+from .description import build_srdf, build_urdf, export_robot_description
 
 __all__ = [
     "IKResult",
@@ -26,4 +27,7 @@ __all__ = [
     "forward_kinematics",
     "solve_pose_ik",
     "solve_position_ik",
+    "build_srdf",
+    "build_urdf",
+    "export_robot_description",
 ]

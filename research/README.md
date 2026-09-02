@@ -4,7 +4,7 @@
 
 作者：`zack7515`
 
-> 資料查核日期：2026-09-01（Asia/Taipei）  
+> 資料查核日期：2026-09-02（Asia/Taipei）
 > 專案階段：純模擬研究；目前沒有實體機器手臂、相機或夾爪。  
 > 適用情境：在模擬器中研究固定式或桌上型機器手臂，以夾爪或吸盤抓取桌面/料箱物件，再搬運至指定位置。  
 > 結論性評分屬於本報告依明確權重建立的工程決策模型，不是跨論文的統一成功率；論文數字只在原實驗條件內解讀。
@@ -33,9 +33,9 @@ SimGrasp3D Lab 的目標不是宣稱已具備實機部署能力，而是建立�
 | 2 | 相機實際看見什麼？ | pinhole、z-buffer、RGB-D、雜訊、孔洞與外參誤差 | ground truth／observation 與深度 metrics | 已完成第一版 |
 | 3 | 動作資料是否連續、可達且可檢查？ | 軟管中心線、關鍵幀、夾取附著、管路距離與動畫 | IK 位置 ≤ 2 mm、無穿透、管長誤差 < 1% | 已完成第一版 |
 | 4 | 路徑是否有充分安全餘量？ | TCP 姿態、flange/TCP offset、夾爪／連桿膠囊體與單 waypoint 搜尋 | 姿態誤差 ≤ 1°、機器人距離 ≥ 5 mm、警示／碰撞 0 幀 | 已完成第一版 |
-| 5 | 軟管接觸行為是否可信？ | MuJoCo cable/flex、重力、摩擦、彎曲、扭轉、夾持力與參數掃描 | 能量、穿透、拉伸、接觸力與 solver sensitivity | 下一步 |
-| 6 | 感知能否驅動同一管線？ | 真實 RGB-D adapter、桌面分割、物件點雲、抓取候選 | 公開資料 replay 與 domain-gap 指標 | 待執行 |
-| 7 | 是否接近真實控制架構？ | URDF/SRDF、MoveIt 2、ROS 2、模擬器與 fail-closed 狀態機 | 可重播 log、規劃成功率與失敗分類 | 待執行 |
+| 5 | 軟管接觸行為是否可信？ | MuJoCo cable、重力、摩擦、彎曲、扭轉、抓持約束與參數掃描 | 能量、穿透、拉伸、抽樣接觸力與 solver sensitivity | 已完成第一版 |
+| 6 | 感知能否驅動同一管線？ | 模擬 RGB-D 桌面分割、物件點雲、包圍盒、法向與抓取候選 | 固定 observation、幾何誤差、候選數與 IK／碰撞驗證 | 已完成第一版；真實資料 adapter 待執行 |
+| 7 | 是否接近真實控制架構？ | 簡化 URDF/SRDF、物理安全閘門、fail-closed 狀態機與 JSONL | 可重播 log、零命令拒絕與失敗分類 | 已完成離線第一版；ROS 2／MoveIt 2 待執行 |
 
 這個順序的核心理由是：物理引擎只能讓錯誤的座標、機構尺寸或路徑以更昂貴的方式失敗。先用幾何時間序列驗證 `TrajectoryFrame`，再讓 MuJoCo 產生同一份逐幀介面，較容易區分「資料／規劃錯誤」與「接觸物理錯誤」。
 
@@ -49,12 +49,25 @@ SimGrasp3D Lab 的目標不是宣稱已具備實機部署能力，而是建立�
 
 目前通過的回歸門檻為：所有 IK 幀的位置誤差不超過 1.77 mm、姿態誤差不超過 0.26°，機器人膠囊體到桌面／管路的最小距離為 5.59 mm，機器人警示與碰撞皆為 0 幀。軟管另有 62 個接觸幀但穿透為 0 幀，總長最大誤差為 0.73%。接觸是抽取行為的一部分，不等於機器人碰撞；目前結果仍是離散幾何近似，不代表已具工業安全性。
 
+### Stage 5～7 第一版實驗結果
+
+固定 MuJoCo baseline 使用 3 ms timestep、4 MPa 彎曲參數與摩擦係數 1.0，共執行 3,363 個物理步進。116 個輸出幀中的抽樣最大環境接觸力為 19.72 N，最大抓持約束誤差為 8.50 mm，軟管長度誤差低於 `1.2e-8`，且沒有 NaN／Inf。解析幾何檢查有 1 個超出 0.25 mm 數值容差的軟管穿透幀，因此整合門檻明確允許最多 1 幀；這是教學 baseline 的已知條件，不應轉用為實機安全容差。
+
+| 敏感度案例 | 相對 baseline 最終形狀 RMS | 抽樣最大接觸力 | 最大抓持誤差 | 解讀 |
+|---|---:|---:|---:|---|
+| baseline | 0.00 mm | 19.72 N | 8.50 mm | 固定比較基準 |
+| soft bend | 414.73 mm | 28.11 N | 8.42 mm | 彎曲參數強烈影響最終形狀 |
+| low friction | 216.46 mm | 17.47 N | 8.54 mm | 雙方接觸面降摩擦後形成可辨識差異 |
+| coarse timestep | 41.25 mm | 39.12 N | 17.24 mm | 粗步長提高力與約束誤差，超出整合門檻 |
+
+RGB-D observation 的 RANSAC 桌面 RMS 為 3.27 mm，共分析 3 個物件、產生 6 個 top-down grasp，其中 1 個通過夾爪開口幾何。該候選再通過 pregrasp/grasp 六自由度 IK 與碰撞檢查；預設物理軌跡亦通過安全門檻，因此離線重播狀態為 `AUTHORIZED`，產生 116 個命令事件。物件分割仍來自模擬 instance mask，且抓取候選驗證與軟管軌跡是兩個獨立測試，不能解讀為感知物件已被完整搬運。
+
 ### 軟管物理引擎怎麼選
 
 | 路線 | 適合用途 | 優點 | 本專案使用時機 |
 |---|---|---|---|
 | 現有幾何約束 | 座標、資料 schema、動畫、IK 與近接警示 | Python 輕量、可解釋、無 GPU | 現在；不宣稱材料或接觸真實性 |
-| MuJoCo cable / flex | 即時接觸、摩擦、可延伸或近似不可延伸軟管 | 機器人整合直接、適合控制與參數掃描 | 下一個物理 baseline |
+| MuJoCo cable / flex | 即時接觸、摩擦、可延伸或近似不可延伸軟管 | 機器人整合直接、適合控制與參數掃描 | 已建立 cable 第一版 baseline |
 | SOFA BeamAdapter | 細長柔性體、Kirchhoff rod、較高保真彎曲／扭轉 | 柔性體方法完整 | MuJoCo 無法符合目標形變時 |
 | Isaac Sim deformable / PhysX | GPU 場景、合成感測與 NVIDIA 生態 | 與 RTX 感測及大量場景整合方便 | 需要大量 domain randomization 時 |
 | Gazebo + MoveIt 2 | ROS 2 系統整合、控制器與規劃流程 | ROS 生態成熟 | 動作／感知介面穩定後 |
@@ -82,6 +95,9 @@ SimGrasp3D Lab 的目標不是宣稱已具備實機部署能力，而是建立�
 | `CONTRIBUTING.md` | 公開協作、隱私與提交規則 |
 | `.githooks/` | 提交前的敏感資訊與 attribution 檢查 |
 | `configs/motions/hose_extraction_demo.json` | 軟管中心線、固定管路、動作關鍵幀與安全餘量 |
+| `configs/physics/hose_mujoco_baseline.json` | MuJoCo cable、材料、摩擦與敏感度案例 |
+| `configs/perception/rgbd_geometry_baseline.json` | 桌面、OBB、法向與 top-down grasp 參數 |
+| `configs/integration/fail_closed_baseline.json` | IK、碰撞、物理與執行授權門檻 |
 | `outputs/motion/trajectory.npz` | 本機生成的逐幀 TCP、關節、軟管與距離資料，不提交 Git |
 
 ## 真實世界資料可以怎麼用
@@ -105,7 +121,7 @@ GraspNet 論文使用 Intel RealSense D435 與 Azure Kinect 同步擷取，以�
 - 公開資料的相機外參通常是該資料集座標，不是本專案 robot base；匯入時不可假設它等於 `T_base_camera`。
 - 真實資料應保留原始深度單位、invalid value、內參和 dataset license，再轉換為本專案的 `RGBDFrame`，不能只保存一份已處理點雲。
 
-## 第一個可執行場景
+## 可執行模擬基準
 
 目前第一版 Python 原型已包含：
 
@@ -116,8 +132,11 @@ GraspNet 論文使用 Intel RealSense D435 與 Azure Kinect 同步擷取，以�
 - 以膠囊體近似連桿、關節、手掌與手指，分項計算桌面／固定管路距離。
 - 以保守 TCP 包覆體檢查關鍵幀直線，並插入單一安全 waypoint。
 - 軟管固定節長、夾取附著、重力近似、固定管路投影與最小距離。
-- 116 幀連續抓取動畫、動作階段時間軸與 `TrajectoryData v2.0` NPZ。
+- 116 幀連續抓取動畫、動作階段時間軸與 `TrajectoryData v3.0` NPZ。
 - 虛擬 RGB-D 相機位置、look-at 目標與視錐。
+- MuJoCo cable 接觸、能量、抓持誤差及彎曲／摩擦／時間步長敏感度。
+- RANSAC 桌面、AABB／OBB、局部表面法向及 top-down 抓取候選。
+- 簡化 URDF/SRDF、fail-closed 安全閘門及 message-neutral JSONL 離線重播。
 - 可旋轉、縮放、切換圖層及讀取 XYZ 的自包含 Plotly HTML。
 - 每個物件、機械手部件與完整場景的 PLY 點雲輸出。
 
@@ -183,7 +202,7 @@ outputs/point_clouds/
 pytest
 ```
 
-目前已在幾何與座標基礎上加入 pinhole 投影、z-buffer、可見 RGB-D 點雲、感測誤差，以及六自由度 IK、機器人尺寸碰撞與 waypoint 安全化。下一階段會讓 MuJoCo 產生相同 `TrajectoryData v2.0` 介面，先驗證軟管接觸、摩擦、彎曲與求解器敏感度；桌面分割、物件幾何與抓取候選則延續使用既有 `RGBDFrame` 介面。
+目前已在幾何與座標基礎上加入 pinhole 投影、z-buffer、可見 RGB-D、感測誤差、六自由度 IK、機器人尺寸碰撞、MuJoCo cable、3D 幾何感知與 fail-closed 離線重播。下一輪研究重點是以真實 RGB-D 取代 oracle instance mask、以實測軟管校正材料與摩擦參數，並將簡化 URDF/SRDF 接入 ROS 2／MoveIt 2 的規劃與控制介面。
 
 ## 先說結論
 

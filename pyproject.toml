@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simgrasp3d-lab"
-version = "0.5.0"
-description = "以 Python 學習 3D 空間、點雲、機械手與抓取模擬"
+version = "0.8.0"
+description = "以 Python 學習 3D 感知、柔性物理、機械手與安全抓取模擬"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "zack7515" }]
 dependencies = [
+  "mujoco>=3.12,<4",
   "numpy>=2.0,<3",
   "plotly>=5.24,<7",
 ]

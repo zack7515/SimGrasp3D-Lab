@@ -238,6 +238,15 @@ class TrajectoryFrame:
     ik_position_error_m: float
     ik_orientation_error_deg: float
     hose_length_ratio: float
+    physics_contact_count: int = 0
+    maximum_contact_force_n: float = 0.0
+    minimum_contact_distance_m: float = 0.0
+    physics_self_contact_count: int = 0
+    maximum_self_contact_force_n: float = 0.0
+    minimum_self_contact_distance_m: float = 0.0
+    potential_energy_j: float = 0.0
+    kinetic_energy_j: float = 0.0
+    grasp_constraint_error_m: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -248,3 +257,5 @@ class TrajectoryData:
     planned_keyframes: tuple[MotionKeyframeSpec, ...]
     frames: tuple[TrajectoryFrame, ...]
     metrics: dict[str, float | int]
+    physics_engine: str | None = None
+    solver_name: str = "kinematic_pose_and_geometric_constraints"

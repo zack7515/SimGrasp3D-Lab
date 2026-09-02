@@ -1,0 +1,29 @@
+{
+  "timestep_s": 0.003,
+  "settling_s": 0.4,
+  "bend_pa": 4000000.0,
+  "twist_pa": 10000000.0,
+  "maximum_velocity_m_s": 0.5,
+  "joint_damping": 0.03,
+  "armature": 0.002,
+  "density_kg_m3": 850.0,
+  "friction": 1.0,
+  "torsional_friction": 0.02,
+  "rolling_friction": 0.001,
+  "attachment_time_constant_s": 0.006,
+  "solver_iterations": 60,
+  "sensitivity_variants": [
+    {
+      "name": "soft_bend",
+      "bend_pa": 1000000.0
+    },
+    {
+      "name": "low_friction",
+      "friction": 0.25
+    },
+    {
+      "name": "coarse_timestep",
+      "timestep_s": 0.006
+    }
+  ]
+}

@@ -10,7 +10,7 @@ import numpy as np
 from simgrasp3d.models.motion import TrajectoryData
 
 
-MOTION_SCHEMA_VERSION = "2.0"
+MOTION_SCHEMA_VERSION = "3.0"
 
 
 def write_trajectory_npz(path: str | Path, trajectory: TrajectoryData) -> Path:
@@ -63,6 +63,35 @@ def write_trajectory_npz(path: str | Path, trajectory: TrajectoryData) -> Path:
         hose_length_ratio=np.asarray(
             [frame.hose_length_ratio for frame in frames], dtype=np.float64
         ),
+        physics_contact_count=np.asarray(
+            [frame.physics_contact_count for frame in frames], dtype=np.int32
+        ),
+        maximum_contact_force_n=np.asarray(
+            [frame.maximum_contact_force_n for frame in frames], dtype=np.float64
+        ),
+        minimum_contact_distance_m=np.asarray(
+            [frame.minimum_contact_distance_m for frame in frames], dtype=np.float64
+        ),
+        physics_self_contact_count=np.asarray(
+            [frame.physics_self_contact_count for frame in frames], dtype=np.int32
+        ),
+        maximum_self_contact_force_n=np.asarray(
+            [frame.maximum_self_contact_force_n for frame in frames],
+            dtype=np.float64,
+        ),
+        minimum_self_contact_distance_m=np.asarray(
+            [frame.minimum_self_contact_distance_m for frame in frames],
+            dtype=np.float64,
+        ),
+        potential_energy_j=np.asarray(
+            [frame.potential_energy_j for frame in frames], dtype=np.float64
+        ),
+        kinetic_energy_j=np.asarray(
+            [frame.kinetic_energy_j for frame in frames], dtype=np.float64
+        ),
+        grasp_constraint_error_m=np.asarray(
+            [frame.grasp_constraint_error_m for frame in frames], dtype=np.float64
+        ),
     )
     return destination
 
@@ -79,8 +108,8 @@ def export_trajectory(output_dir: str | Path, trajectory: TrajectoryData) -> dic
         "scenario_name": trajectory.spec.name,
         "length_unit": "meter",
         "time_unit": "second",
-        "solver": "kinematic_pose_and_geometric_constraints",
-        "physics_engine": None,
+        "solver": trajectory.solver_name,
+        "physics_engine": trajectory.physics_engine,
         "safe_clearance_m": trajectory.spec.safe_clearance_m,
         "collision_tolerance_m": trajectory.spec.collision_tolerance_m,
         "waypoint_planner": {
