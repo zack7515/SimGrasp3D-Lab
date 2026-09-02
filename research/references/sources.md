@@ -11,6 +11,11 @@
 | 模擬操作介面 | [Isaac Sim GUI Reference](https://docs.isaacsim.omniverse.nvidia.com/latest/gui/index.html) | viewport、Stage、Property Window 與用途導向 panel 的操作層次 |
 | 動畫圖形 | [Plotly Python Animations](https://plotly.com/python/animations/) | 固定視域、播放／暫停參數與 3D 動畫平滑轉場限制 |
 | 動態可及性 | [W3C Technique C39](https://www.w3.org/WAI/WCAG21/Techniques/css/C39.html) | 以 `prefers-reduced-motion` 尊重使用者的低動態偏好 |
+| 醫院設施協調 | [Open-RMF Demos](https://github.com/open-rmf/rmf_demos/blob/main/README.md) | clinic world、門、電梯、多車隊與任務協調的官方示範 |
+| 生物力學模擬 | [SOFA Features](https://www.sofa-framework.org/about/features/) | 軟／剛體、FEM、biomechanics 與 medical simulation 能力定位 |
+| 探頭組織接觸 | [SOFA Probe–Tissue Tutorial](https://www.sofa-framework.org/applications/plugins/tutorial-probe-tissue-interaction/) | rigid probe 與 soft object 的 penalty／constraint 參考場景 |
+| 手術機器人研究 | [SurRoL](https://github.com/med-air/surrol) | dVRK、PyBullet／Taichi、RL task environment 與研究程式入口 |
+| 醫療風險管理 | [ISO 14971:2019](https://www.iso.org/standard/72704.html) | 醫療器材危害識別、風險評估、控制與生命週期監測框架 |
 | 即時閉迴路 | [MoveIt Realtime Servo](https://moveit.picknik.ai/main/doc/examples/realtime_servo/realtime_servo_tutorial.html) | visual servo、奇異點、碰撞、平滑與關節限制 |
 | 手眼標定 | [Zivid Hand-Eye Calibration API](https://support.zivid.com/en/latest/camera/api-reference/hand-eye-calibration.html) | eye-in-hand/eye-to-hand 的 4×4 transform 定義與 residual |
 | 手眼驗證 | [Zivid Touch Test](https://support.zivid.com/en/v2.8/academy/applications/hand-eye/hand-eye-calibration-verification-via-touch-test.html) | 用實際 TCP 接觸驗證手眼結果 |

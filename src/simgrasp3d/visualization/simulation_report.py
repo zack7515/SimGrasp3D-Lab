@@ -109,6 +109,20 @@ summary:focus-visible {
   font-size: 12px;
 }
 
+.suite-link {
+  display: inline-flex;
+  margin: 14px 7px 0 0;
+  padding: 8px 11px;
+  color: #b7fff3;
+  border: 1px solid #49606c;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+}
+
+.suite-link:hover { color: #ffffff; border-color: #7ee5d6; }
+
 h1 {
   margin: 0;
   max-width: 900px;
@@ -1146,6 +1160,9 @@ def write_simulation_report(
     physics_sweep: PhysicsSweepData | None = None,
     perception: PerceptionResult | None = None,
     replay: ReplayResult | None = None,
+    hospital_dashboard_href: str | None = None,
+    system_design_href: str | None = None,
+    home_href: str | None = None,
 ) -> Path:
     """輸出世界、感測、動作、物理、感知與安全整合的單頁報告。"""
 
@@ -1272,6 +1289,21 @@ def write_simulation_report(
         command_signal = "ABORTED"
         command_signal_class = " is-fault"
     page_title = f"SimGrasp3D｜{spec.name}｜模擬驗證報告"
+    hospital_link = (
+        f'<a class="suite-link" href="{escape(hospital_dashboard_href)}">開啟醫院模擬學習套件 →</a>'
+        if hospital_dashboard_href is not None
+        else ""
+    )
+    design_link = (
+        f'<a class="suite-link" href="{escape(system_design_href)}">開啟系統設計實驗室 →</a>'
+        if system_design_href is not None
+        else ""
+    )
+    home_link = (
+        f'<a class="suite-link" href="{escape(home_href)}">← 專案學習主頁</a>'
+        if home_href is not None
+        else ""
+    )
     document = f"""<!doctype html>
 <html lang="zh-Hant">
 <head>
@@ -1288,6 +1320,9 @@ def write_simulation_report(
       <div>
         <p class="eyebrow">SimGrasp3D / simulation validation</p>
         <h1>從世界座標到安全命令</h1>
+        {home_link}
+        {design_link}
+        {hospital_link}
       </div>
       <div class="run-state" aria-label="執行識別">
         <div class="state-cell"><span class="meta-label">Scene</span><span class="meta-value">{escape(spec.name)}</span></div>

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import webbrowser
 from pathlib import Path
 
@@ -13,21 +14,34 @@ from simgrasp3d.io.physics import export_physics_sweep
 from simgrasp3d.io.rgbd_frame import export_rgbd_simulation
 from simgrasp3d.io.point_cloud import export_scene_point_clouds
 from simgrasp3d.io.trajectory import export_trajectory
+from simgrasp3d.io.hospital import export_hospital_suite
+from simgrasp3d.io.system_design import export_system_design_result
 from simgrasp3d.scene.builder import build_scene, load_scene_spec
 from simgrasp3d.perception import analyze_rgbd_geometry, load_perception_spec
 from simgrasp3d.robot.description import export_robot_description
 from simgrasp3d.sensors.rgbd import simulate_rgbd
 from simgrasp3d.simulation.hose_motion import load_hose_motion_spec, simulate_hose_motion
+from simgrasp3d.simulation.hospital_cases import (
+    load_hospital_suite_spec,
+    simulate_hospital_suite,
+)
 from simgrasp3d.simulation.mujoco_hose import (
     load_mujoco_hose_spec,
     simulate_physics_sweep,
 )
+from simgrasp3d.simulation.system_design import (
+    load_system_design_spec,
+    simulate_system_design_lab,
+)
 from simgrasp3d.visualization.motion_viewer import write_motion_html
+from simgrasp3d.visualization.hospital_dashboard import write_hospital_dashboard
+from simgrasp3d.visualization.home_dashboard import write_home_dashboard
 from simgrasp3d.visualization.perception_viewer import write_perception_html
 from simgrasp3d.visualization.physics_viewer import write_physics_comparison_html
 from simgrasp3d.visualization.plotly_viewer import write_scene_html
 from simgrasp3d.visualization.rgbd_viewer import write_rgbd_comparison_html
 from simgrasp3d.visualization.simulation_report import write_simulation_report
+from simgrasp3d.visualization.system_design_lab import write_system_design_lab
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -65,6 +79,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("outputs/simulation_report.html"),
         help="原始場景、感測結果與連續動作的單頁報告路徑",
+    )
+    parser.add_argument(
+        "--home-output",
+        type=Path,
+        default=Path("outputs/index.html"),
+        help="統一導覽、學習順序與本次執行摘要的專案主頁",
     )
     parser.add_argument(
         "--motion-config",
@@ -121,6 +141,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="URDF、SRDF、JSONL 重播與安全摘要輸出目錄",
     )
     parser.add_argument(
+        "--hospital-config",
+        type=Path,
+        default=Path("configs/hospital/hospital_learning_suite.json"),
+        help="醫院多案例與教學門檻 JSON 設定檔",
+    )
+    parser.add_argument(
+        "--hospital-output-dir",
+        type=Path,
+        default=Path("outputs/hospital"),
+        help="醫院案例資料、索引與分頁動畫輸出目錄",
+    )
+    parser.add_argument(
+        "--design-config",
+        type=Path,
+        default=Path("configs/learning/system_design_lab.json"),
+        help="系統設計工作台的可調參數與教學門檻 JSON",
+    )
+    parser.add_argument(
+        "--design-output",
+        type=Path,
+        default=Path("outputs/system_design_lab.html"),
+        help="可離線調參的系統設計工作台 HTML",
+    )
+    parser.add_argument(
+        "--design-data-output",
+        type=Path,
+        default=Path("outputs/system_design_result.json"),
+        help="系統設計基準與 preset 評估 JSON",
+    )
+    parser.add_argument(
         "--no-export-point-clouds",
         action="store_true",
         help="不匯出完整場景 PLY；RGB-D 感測產物不受影響",
@@ -149,6 +199,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-build-replay",
         action="store_true",
         help="略過 URDF/SRDF 與 fail-closed 控制重播",
+    )
+    parser.add_argument(
+        "--no-simulate-hospital",
+        action="store_true",
+        help="略過醫院情境案例與多頁分析介面",
+    )
+    parser.add_argument(
+        "--no-build-design-lab",
+        action="store_true",
+        help="略過手臂、相機、軟管與障礙物的可調參數學習工作台",
     )
     parser.add_argument(
         "--open",
@@ -182,6 +242,31 @@ def main(argv: list[str] | None = None) -> int:
     print(f"互動式視覺化：{html_path}")
     if exported_count:
         print(f"PLY 點雲：{args.point_cloud_dir.resolve()}（{exported_count} 個檔案）")
+
+    design_path: Path | None = None
+    design_result = None
+    if not args.no_build_design_lab:
+        design_spec = load_system_design_spec(args.design_config)
+        design_motion_spec = load_hose_motion_spec(args.motion_config)
+        design_result = simulate_system_design_lab(
+            design_spec,
+            spec,
+            design_motion_spec,
+        )
+        design_path = write_system_design_lab(
+            design_result,
+            spec,
+            design_motion_spec,
+            args.design_output,
+        ).resolve()
+        design_data_path = export_system_design_result(
+            args.design_data_output,
+            design_result,
+        ).resolve()
+        passed = int(design_result.baseline.metrics["passed_gate_count"])
+        total = int(design_result.baseline.metrics["gate_count"])
+        print(f"系統設計工作台：基準 {passed}/{total} 閘門通過｜{design_path}")
+        print(f"系統設計資料：{design_data_path}")
 
     motion_path: Path | None = None
     motion_trajectory = None
@@ -315,8 +400,49 @@ def main(argv: list[str] | None = None) -> int:
         print(f"URDF/SRDF：{description_paths['urdf'].resolve()}")
         print(f"控制重播：{replay_paths['replay'].resolve()}")
 
+    hospital_index: Path | None = None
+    hospital_suite = None
+    if not args.no_simulate_hospital:
+        hospital_spec = load_hospital_suite_spec(args.hospital_config)
+        hospital_suite = simulate_hospital_suite(hospital_spec)
+        hospital_data_paths = export_hospital_suite(
+            args.hospital_output_dir,
+            hospital_suite,
+        )
+        hospital_pages = write_hospital_dashboard(
+            args.hospital_output_dir,
+            hospital_suite,
+        )
+        hospital_index = hospital_pages["index"].resolve()
+        failed_metrics = sum(
+            metric.passed is False
+            for case in hospital_suite.cases
+            for metric in case.metrics
+        )
+        print(
+            "醫院案例："
+            f"{len(hospital_suite.cases)} 個｜"
+            f"安全門檻停止={failed_metrics}｜"
+            f"seed={hospital_suite.spec.seed}"
+        )
+        print(f"醫院分析入口：{hospital_index}")
+        print(f"醫院案例資料：{hospital_data_paths['summary'].resolve()}")
+
     report_path: Path | None = None
     if sensor_result is not None:
+        hospital_href = None
+        if hospital_index is not None:
+            hospital_href = Path(
+                os.path.relpath(hospital_index, start=args.report_output.parent.resolve())
+            ).as_posix()
+        design_href = None
+        if design_path is not None:
+            design_href = Path(
+                os.path.relpath(design_path, start=args.report_output.parent.resolve())
+            ).as_posix()
+        home_href = Path(
+            os.path.relpath(args.home_output.resolve(), start=args.report_output.parent.resolve())
+        ).as_posix()
         report_path = write_simulation_report(
             scene_data,
             sensor_result,
@@ -325,12 +451,37 @@ def main(argv: list[str] | None = None) -> int:
             physics_sweep=physics_sweep,
             perception=perception_result,
             replay=replay_result,
+            hospital_dashboard_href=hospital_href,
+            system_design_href=design_href,
+            home_href=home_href,
         ).resolve()
         print(f"單頁驗證報告：{report_path}")
 
+    def relative_to_home(path: Path | None) -> str | None:
+        if path is None:
+            return None
+        return Path(
+            os.path.relpath(path, start=args.home_output.parent.resolve())
+        ).as_posix()
+
+    home_path = write_home_dashboard(
+        args.home_output,
+        scene_data,
+        design=design_result,
+        sensor=sensor_result,
+        trajectory=motion_trajectory,
+        physics=physics_sweep,
+        perception=perception_result,
+        replay=replay_result,
+        hospital=hospital_suite,
+        design_href=relative_to_home(design_path),
+        report_href=relative_to_home(report_path),
+        hospital_href=relative_to_home(hospital_index),
+    ).resolve()
+    print(f"專案學習主頁：{home_path}")
+
     if args.open:
-        browser_target = report_path or motion_path or html_path
-        webbrowser.open(browser_target.as_uri())
+        webbrowser.open(home_path.as_uri())
     return 0
 
 

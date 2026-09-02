@@ -1,0 +1,172 @@
+{
+  "name": "tabletop_hose_system_design",
+  "seed": 7515,
+  "scenario_summary": "使用固定式 RGB-D 相機觀察桌上軟管，由六軸機械手避開三根固定管路，將軟管夾取並移動至指定放置區。",
+  "parameters": [
+    {
+      "key": "camera_height_m",
+      "group": "感知與標定",
+      "label": "相機高度",
+      "value": 1.18,
+      "minimum": 0.55,
+      "maximum": 1.60,
+      "step": 0.01,
+      "unit": "m",
+      "description": "改變視野覆蓋、深度距離與被障礙遮蔽的機率。"
+    },
+    {
+      "key": "camera_lateral_m",
+      "group": "感知與標定",
+      "label": "相機 Y 位置",
+      "value": -0.85,
+      "minimum": -1.20,
+      "maximum": 0.20,
+      "step": 0.01,
+      "unit": "m",
+      "description": "eye-to-hand 相機的側向安裝位置；用來觀察視線是否被管路遮住。"
+    },
+    {
+      "key": "camera_fov_deg",
+      "group": "感知與標定",
+      "label": "垂直視角",
+      "value": 52.0,
+      "minimum": 32.0,
+      "maximum": 82.0,
+      "step": 1.0,
+      "unit": "deg",
+      "description": "視角較大可增加覆蓋，但同解析度下每個像素涵蓋的面積也會增加。"
+    },
+    {
+      "key": "depth_noise_scale",
+      "group": "感知與標定",
+      "label": "深度誤差倍率",
+      "value": 1.0,
+      "minimum": 0.25,
+      "maximum": 3.0,
+      "step": 0.05,
+      "unit": "x",
+      "description": "將量化、距離雜訊與外參誤差合成為保守的 3σ 深度不確定度。"
+    },
+    {
+      "key": "arm_reach_scale",
+      "group": "機械手與工作空間",
+      "label": "手臂尺度倍率",
+      "value": 1.0,
+      "minimum": 0.60,
+      "maximum": 1.25,
+      "step": 0.01,
+      "unit": "x",
+      "description": "等比例改變連桿與 TCP 長度，用工作空間包絡先篩掉明顯不可達的設計。"
+    },
+    {
+      "key": "gripper_command_m",
+      "group": "夾爪與軟管",
+      "label": "閉爪指令開口",
+      "value": 0.026,
+      "minimum": 0.010,
+      "maximum": 0.055,
+      "step": 0.001,
+      "unit": "m",
+      "description": "與軟管外徑比較；真正夾持力仍需要指墊、摩擦與材料模型。"
+    },
+    {
+      "key": "hose_radius_m",
+      "group": "夾爪與軟管",
+      "label": "軟管半徑",
+      "value": 0.012,
+      "minimum": 0.006,
+      "maximum": 0.025,
+      "step": 0.001,
+      "unit": "m",
+      "description": "同時影響可見尺度、夾持相容性與軟管對障礙物的表面淨空。"
+    },
+    {
+      "key": "hose_min_bend_radius_m",
+      "group": "夾爪與軟管",
+      "label": "允許最小彎曲半徑",
+      "value": 0.055,
+      "minimum": 0.025,
+      "maximum": 0.180,
+      "step": 0.005,
+      "unit": "m",
+      "description": "材料或產品規格限制；中心線局部曲率半徑不可小於此值。"
+    },
+    {
+      "key": "grasp_fraction",
+      "group": "夾爪與軟管",
+      "label": "沿軟管夾取位置",
+      "value": 0.48,
+      "minimum": 0.10,
+      "maximum": 0.90,
+      "step": 0.01,
+      "unit": "ratio",
+      "description": "0 是軟管起點、1 是末端；會同時改變視線、可達性與抽取路徑。"
+    },
+    {
+      "key": "obstacle_radius_scale",
+      "group": "路徑與安全",
+      "label": "障礙物包絡倍率",
+      "value": 1.0,
+      "minimum": 0.75,
+      "maximum": 1.80,
+      "step": 0.05,
+      "unit": "x",
+      "description": "把管路尺寸、建模誤差及定位誤差合併成較保守的碰撞包絡。"
+    },
+    {
+      "key": "safety_margin_m",
+      "group": "路徑與安全",
+      "label": "要求安全距離",
+      "value": 0.015,
+      "minimum": 0.002,
+      "maximum": 0.080,
+      "step": 0.001,
+      "unit": "m",
+      "description": "規劃路徑的最低表面淨空；不是控制器的認證安全距離。"
+    },
+    {
+      "key": "lift_height_m",
+      "group": "路徑與安全",
+      "label": "夾取後抬升高度",
+      "value": 0.30,
+      "minimum": 0.10,
+      "maximum": 0.55,
+      "step": 0.01,
+      "unit": "m",
+      "description": "增加高度通常能繞開低障礙，但會增加路徑長度並逼近工作空間邊界。"
+    }
+  ],
+  "thresholds": {
+    "maximum_depth_uncertainty_m": 0.015,
+    "minimum_reach_reserve_m": 0.035,
+    "maximum_gripper_diameter_error_m": 0.004,
+    "minimum_visibility_ratio": 0.85
+  },
+  "presets": [
+    {
+      "name": "基準設計",
+      "description": "目前 JSON 基準，適合先讀懂每一個安全閘門。",
+      "values": {}
+    },
+    {
+      "name": "相機過低",
+      "description": "縮短距離不一定更好；觀察視野與遮蔽如何改變。",
+      "values": {"camera_height_m": 0.55, "camera_lateral_m": -0.10, "camera_fov_deg": 32.0}
+    },
+    {
+      "name": "手臂過短",
+      "description": "感知成功但工作空間不足，展示跨子系統失敗。",
+      "values": {"arm_reach_scale": 0.64}
+    },
+    {
+      "name": "夾爪不匹配",
+      "description": "路徑可行不代表夾爪尺寸與軟管相容。",
+      "values": {"gripper_command_m": 0.045, "hose_radius_m": 0.010}
+    },
+    {
+      "name": "保守避障",
+      "description": "放大障礙包絡與安全距離，觀察 waypoint 與工作空間代價。",
+      "values": {"obstacle_radius_scale": 1.45, "safety_margin_m": 0.045, "lift_height_m": 0.42}
+    }
+  ]
+}

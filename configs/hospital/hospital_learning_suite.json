@@ -1,0 +1,115 @@
+{
+  "name": "hospital_robotics_learning_suite",
+  "seed": 7515,
+  "frame_rate_hz": 10,
+  "cases": [
+    {
+      "id": "specimen_transfer",
+      "order": 1,
+      "title": "檢體試管轉移",
+      "short_title": "檢體轉移",
+      "domain": "檢驗室剛體操作",
+      "risk_level": "low",
+      "maturity": "L2 幾何＋感測基準",
+      "enabled": true,
+      "parameters": {
+        "observation_noise_m": 0.0012,
+        "maximum_final_error_m": 0.006,
+        "maximum_tilt_deg": 10.0,
+        "minimum_clearance_m": 0.025
+      }
+    },
+    {
+      "id": "sterile_tray",
+      "order": 2,
+      "title": "無菌器械盤擺位",
+      "short_title": "器械盤",
+      "domain": "語意區域與剛體放置",
+      "risk_level": "medium",
+      "maturity": "L2 幾何＋規則基準",
+      "enabled": true,
+      "parameters": {
+        "observation_noise_m": 0.0015,
+        "maximum_final_error_m": 0.008,
+        "maximum_sterile_violations": 0
+      }
+    },
+    {
+      "id": "bedside_tubing",
+      "order": 3,
+      "title": "病床旁多管路整理",
+      "short_title": "床旁管路",
+      "domain": "柔性物操作",
+      "risk_level": "medium",
+      "maturity": "L1 未校正柔性代理",
+      "enabled": true,
+      "parameters": {
+        "observation_noise_m": 0.0025,
+        "maximum_tension_proxy_n": 8.0,
+        "minimum_bend_radius_m": 0.018,
+        "maximum_forbidden_entries": 0
+      }
+    },
+    {
+      "id": "ward_delivery",
+      "order": 4,
+      "title": "跨病區耗材配送",
+      "short_title": "院內配送",
+      "domain": "人流與設施協調",
+      "risk_level": "low",
+      "maturity": "L1 走廊事件基準",
+      "enabled": true,
+      "parameters": {
+        "observation_noise_m": 0.02,
+        "minimum_human_clearance_m": 0.45,
+        "required_wait_s": 1.0
+      }
+    },
+    {
+      "id": "disinfection_coverage",
+      "order": 5,
+      "title": "病房表面消毒覆蓋",
+      "short_title": "消毒覆蓋",
+      "domain": "覆蓋規劃",
+      "risk_level": "medium",
+      "maturity": "L1 劑量幾何代理",
+      "enabled": true,
+      "parameters": {
+        "observation_noise_m": 0.008,
+        "dose_radius_m": 0.24,
+        "minimum_coverage_ratio": 0.9
+      }
+    },
+    {
+      "id": "ultrasound_phantom",
+      "order": 6,
+      "title": "假體超音波探頭掃描",
+      "short_title": "探頭掃描",
+      "domain": "軟組織接觸",
+      "risk_level": "high",
+      "maturity": "L0 Kelvin–Voigt 教學代理",
+      "enabled": true,
+      "parameters": {
+        "observation_noise_m": 0.001,
+        "target_force_n": 3.5,
+        "maximum_force_n": 7.0,
+        "minimum_contact_ratio": 0.95
+      }
+    },
+    {
+      "id": "catheter_navigation",
+      "order": 7,
+      "title": "導管路徑研究預覽",
+      "short_title": "導管預覽",
+      "domain": "微創連續體操作",
+      "risk_level": "very_high",
+      "maturity": "L0 中心線與摩擦代理",
+      "enabled": true,
+      "parameters": {
+        "observation_noise_m": 0.0008,
+        "maximum_force_proxy_n": 2.0,
+        "maximum_wall_violations": 0
+      }
+    }
+  ]
+}
