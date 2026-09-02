@@ -9,6 +9,13 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from simgrasp3d.sensors.rgbd import RGBDSimulationResult
+from simgrasp3d.visualization.theme import (
+    AMBER,
+    MONO_FONT,
+    SCANLINE,
+    SLATE,
+    instrument_layout,
+)
 
 
 def _display_depth(depth_m: np.ndarray) -> np.ndarray:
@@ -46,7 +53,7 @@ def build_rgbd_comparison_figure(result: RGBDSimulationResult) -> go.Figure:
         vertical_spacing=0.12,
     )
     heatmap_options = {
-        "colorscale": "Turbo",
+        "colorscale": "Viridis",
         "zmin": depth_min,
         "zmax": depth_max,
         "colorbar": {"title": "m", "len": 0.40, "thickness": 12},
@@ -67,7 +74,7 @@ def build_rgbd_comparison_figure(result: RGBDSimulationResult) -> go.Figure:
     figure.add_trace(
         go.Heatmap(
             z=absolute_error,
-            colorscale="Magma",
+            colorscale="Inferno",
             colorbar={"title": "m", "len": 0.40, "y": 0.22, "thickness": 12},
             hovertemplate="u=%{x}<br>v=%{y}<br>|error|=%{z:.4f} m<extra></extra>",
         ),
@@ -77,23 +84,38 @@ def build_rgbd_comparison_figure(result: RGBDSimulationResult) -> go.Figure:
     figure.add_trace(go.Image(z=result.observation.rgb), row=2, col=2)
     metrics = result.metrics
     figure.update_layout(
-        title={
-            "text": (
-                "SimGrasp3D RGB-D 感測模擬"
-                f"<br><sup>MAE={metrics['depth_mae_m'] * 1000.0:.2f} mm｜"
-                f"RMSE={metrics['depth_rmse_m'] * 1000.0:.2f} mm｜"
-                f"有效觀測={metrics['observation_valid_pixels']} pixels</sup>"
-            ),
-            "x": 0.5,
-        },
-        template="plotly_white",
-        height=820,
-        margin={"l": 35, "r": 80, "t": 100, "b": 35},
+        **instrument_layout(
+            height=820,
+            margin={"l": 35, "r": 80, "t": 96, "b": 35},
+            title={
+                "text": (
+                    "SimGrasp3D RGB-D 感測模擬"
+                    f"<br><sup>MAE={metrics['depth_mae_m'] * 1000.0:.2f} mm｜"
+                    f"RMSE={metrics['depth_rmse_m'] * 1000.0:.2f} mm｜"
+                    f"有效觀測={metrics['observation_valid_pixels']} pixels</sup>"
+                ),
+                "x": 0.02,
+                "xanchor": "left",
+            },
+        ),
     )
     figure.update_yaxes(autorange="reversed", scaleanchor="x", scaleratio=1, row=1, col=1)
     figure.update_yaxes(autorange="reversed", scaleanchor="x2", scaleratio=1, row=1, col=2)
     figure.update_yaxes(autorange="reversed", scaleanchor="x3", scaleratio=1, row=2, col=1)
     figure.update_yaxes(autorange="reversed", scaleanchor="x4", scaleratio=1, row=2, col=2)
+    figure.update_xaxes(
+        showgrid=False,
+        zeroline=False,
+        tickfont={"family": MONO_FONT, "size": 9, "color": SLATE},
+        linecolor=SCANLINE,
+    )
+    figure.update_yaxes(
+        showgrid=False,
+        zeroline=False,
+        tickfont={"family": MONO_FONT, "size": 9, "color": SLATE},
+        linecolor=SCANLINE,
+    )
+    figure.update_annotations(font={"size": 12, "color": AMBER})
     return figure
 
 

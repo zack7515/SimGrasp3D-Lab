@@ -9,6 +9,16 @@ import plotly.graph_objects as go
 
 from simgrasp3d.geometry.sampling import PointCloud
 from simgrasp3d.scene.builder import SceneData
+from simgrasp3d.visualization.theme import (
+    CERAMIC,
+    MONO_FONT,
+    SCANLINE,
+    SLATE,
+    TITANIUM,
+    VIOLET,
+    instrument_layout,
+    scene_axes,
+)
 
 
 def _rgb(color: tuple[float, float, float]) -> str:
@@ -103,45 +113,67 @@ def build_figure(scene_data: SceneData) -> go.Figure:
 
     joint_positions = scene_data.robot_state.joint_positions
     skeleton_segments = np.asarray(
-        [[joint_positions[index], joint_positions[index + 1]] for index in range(len(joint_positions) - 1)]
+        [
+            [joint_positions[index], joint_positions[index + 1]]
+            for index in range(len(joint_positions) - 1)
+        ]
     )
-    figure.add_trace(_segments_trace(skeleton_segments, "robot_skeleton", "#263238", 7))
-    figure.add_trace(_segments_trace(scene_data.camera_segments, "camera_frustum", "#8e24aa", 4))
+    figure.add_trace(_segments_trace(skeleton_segments, "robot_skeleton", TITANIUM, 7))
+    figure.add_trace(_segments_trace(scene_data.camera_segments, "camera_frustum", VIOLET, 4))
 
-    frame_names = ["world", "robot_base", "tool", "camera"] + [item.name for item in scene_data.spec.objects]
+    frame_names = ["world", "robot_base", "tool", "camera"] + [
+        item.name for item in scene_data.spec.objects
+    ]
     for frame_name in frame_names:
         figure.add_traces(_frame_traces(frame_name, scene_data.frames[frame_name]))
 
     tool_position = scene_data.robot_state.tool_frame[:3, 3]
     figure.update_layout(
-        title={
-            "text": (
-                f"SimGrasp3D Lab｜{scene_data.spec.name}"
-                f"<br><sup>純模擬點雲｜seed={scene_data.spec.seed}｜"
-                f"TCP=({tool_position[0]:.3f}, {tool_position[1]:.3f}, {tool_position[2]:.3f}) m</sup>"
-            ),
-            "x": 0.5,
+        **instrument_layout(
+            height=720,
+            margin={"l": 0, "r": 0, "t": 84, "b": 12},
+            title={
+                "text": (
+                    f"SimGrasp3D Lab｜{scene_data.spec.name}"
+                    f"<br><sup>純模擬點雲｜seed={scene_data.spec.seed}｜"
+                    f"TCP=({tool_position[0]:.3f}, {tool_position[1]:.3f}, "
+                    f"{tool_position[2]:.3f}) m</sup>"
+                ),
+                "x": 0.02,
+                "xanchor": "left",
+            },
+        ),
+        uirevision="world-camera",
+        legend={
+            "x": 0.01,
+            "y": 0.99,
+            "bgcolor": "rgba(244,247,246,0.88)",
+            "bordercolor": SCANLINE,
+            "borderwidth": 1,
+            "font": {"size": 10},
         },
-        template="plotly_white",
-        margin={"l": 0, "r": 0, "t": 88, "b": 0},
-        legend={"x": 0.01, "y": 0.99, "bgcolor": "rgba(255,255,255,0.78)"},
         scene={
-            "xaxis": {"title": "X（m）", "showspikes": False},
-            "yaxis": {"title": "Y（m）", "showspikes": False},
-            "zaxis": {"title": "Z（m）", "showspikes": False},
+            "uirevision": "world-camera",
+            "xaxis": scene_axes("X（m）"),
+            "yaxis": scene_axes("Y（m）"),
+            "zaxis": scene_axes("Z（m）"),
             "aspectmode": "data",
             "camera": {"eye": {"x": 1.55, "y": -1.55, "z": 1.05}},
-            "bgcolor": "rgb(246,248,250)",
+            "bgcolor": CERAMIC,
+            "dragmode": "orbit",
         },
         annotations=[
             {
-                "text": "滑鼠左鍵旋轉｜滾輪縮放｜圖例可切換物件｜游標停留查看座標與尺寸",
+                "text": "拖曳旋轉｜滾輪縮放｜點選圖例切換圖層｜停留讀取座標與尺寸",
                 "xref": "paper",
                 "yref": "paper",
                 "x": 0.5,
                 "y": 0.01,
                 "showarrow": False,
-                "bgcolor": "rgba(255,255,255,0.80)",
+                "bgcolor": "rgba(244,247,246,0.88)",
+                "bordercolor": SCANLINE,
+                "borderwidth": 1,
+                "font": {"family": MONO_FONT, "size": 10, "color": SLATE},
             }
         ],
     )
@@ -161,4 +193,3 @@ def write_scene_html(scene_data: SceneData, output_path: str | Path) -> Path:
         config={"displaylogo": False, "responsive": True, "scrollZoom": True},
     )
     return destination
-

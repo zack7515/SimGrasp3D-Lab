@@ -9,6 +9,18 @@ import plotly.graph_objects as go
 
 from simgrasp3d.models.perception import BoundingBox3D, PerceptionResult
 from simgrasp3d.sensors.rgbd import RGBDFrame
+from simgrasp3d.visualization.theme import (
+    AMBER,
+    BLUE,
+    CERAMIC,
+    FAULT,
+    LASER,
+    SCANLINE,
+    SLATE,
+    VIOLET,
+    instrument_layout,
+    scene_axes,
+)
 
 
 _BOX_EDGES = (
@@ -57,12 +69,12 @@ def build_perception_figure(
             y=points[:, 1],
             z=points[:, 2],
             mode="markers",
-            marker={"size": 2, "color": "#9aa9b2", "opacity": 0.22},
+            marker={"size": 2, "color": SLATE, "opacity": 0.18},
             name="Observation",
             hoverinfo="skip",
         )
     )
-    palette = ("#2787c7", "#e8902e", "#38a169")
+    palette = (BLUE, AMBER, LASER)
     for object_index, geometry in enumerate(result.objects):
         color = palette[object_index % len(palette)]
         figure.add_trace(
@@ -105,7 +117,7 @@ def build_perception_figure(
                 y=normal_y,
                 z=normal_z,
                 mode="lines",
-                line={"color": "#675d9b", "width": 2},
+                line={"color": VIOLET, "width": 2},
                 name=f"{geometry.name} normals",
                 hoverinfo="skip",
                 visible="legendonly",
@@ -113,7 +125,7 @@ def build_perception_figure(
         )
 
     for index, candidate in enumerate(result.grasp_candidates):
-        status_color = "#18ad9c" if candidate.geometry_feasible else "#d85c4a"
+        status_color = LASER if candidate.geometry_feasible else FAULT
         half_width = candidate.required_opening_m / 2.0
         closing_segment = np.asarray(
             [
@@ -144,19 +156,34 @@ def build_perception_figure(
         )
 
     figure.update_layout(
-        title={"text": "RGB-D 幾何與抓取候選", "x": 0.02, "xanchor": "left"},
+        **instrument_layout(
+            height=680,
+            margin={"l": 0, "r": 0, "t": 48, "b": 48},
+            title={
+                "text": "RGB-D 幾何與抓取候選",
+                "x": 0.02,
+                "xanchor": "left",
+            },
+        ),
+        uirevision="perception-camera",
         scene={
+            "uirevision": "perception-camera",
             "aspectmode": "data",
-            "xaxis_title": "X (m)",
-            "yaxis_title": "Y (m)",
-            "zaxis_title": "Z (m)",
+            "xaxis": scene_axes("X（m）"),
+            "yaxis": scene_axes("Y（m）"),
+            "zaxis": scene_axes("Z（m）"),
             "camera": {"eye": {"x": 1.45, "y": -1.65, "z": 1.15}},
+            "bgcolor": CERAMIC,
+            "dragmode": "orbit",
         },
-        legend={"orientation": "h", "y": -0.08},
-        margin={"l": 0, "r": 0, "t": 48, "b": 28},
-        paper_bgcolor="#f7fafb",
-        plot_bgcolor="#f7fafb",
-        height=680,
+        legend={
+            "orientation": "h",
+            "y": -0.08,
+            "bgcolor": "rgba(244,247,246,0.88)",
+            "bordercolor": SCANLINE,
+            "borderwidth": 1,
+            "font": {"size": 10},
+        },
     )
     return figure
 

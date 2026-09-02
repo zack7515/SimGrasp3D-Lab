@@ -10,6 +10,19 @@ from plotly.subplots import make_subplots
 
 from simgrasp3d.models.motion import TrajectoryData
 from simgrasp3d.models.physics import PhysicsSweepData
+from simgrasp3d.visualization.theme import (
+    AMBER,
+    BLUE,
+    FAULT,
+    LASER,
+    MONO_FONT,
+    SCANLINE,
+    SLATE,
+    TITANIUM,
+    VIOLET,
+    instrument_layout,
+    scene_axes,
+)
 
 
 def build_physics_comparison_figure(
@@ -28,8 +41,8 @@ def build_physics_comparison_figure(
         vertical_spacing=0.12,
     )
     for name, trajectory, color, dash in (
-        ("幾何約束", kinematic, "#718592", "dash"),
-        ("MuJoCo cable", physics, "#18ad9c", "solid"),
+        ("幾何約束", kinematic, SLATE, "dash"),
+        ("MuJoCo cable", physics, LASER, "solid"),
     ):
         nodes = trajectory.frames[-1].hose_nodes
         figure.add_trace(
@@ -57,7 +70,7 @@ def build_physics_comparison_figure(
                 y=[start[1], end[1]],
                 z=[start[2], end[2]],
                 mode="lines",
-                line={"color": "#405463", "width": max(8, obstacle.radius * 260)},
+                line={"color": TITANIUM, "width": max(8, obstacle.radius * 260)},
                 name=obstacle.name,
                 hoverinfo="skip",
                 showlegend=False,
@@ -72,7 +85,7 @@ def build_physics_comparison_figure(
             x=time_s,
             y=[frame.maximum_contact_force_n for frame in physics.frames],
             mode="lines",
-            line={"color": "#d85c4a", "width": 2.5},
+            line={"color": FAULT, "width": 2.5},
             name="接觸力 (N)",
         ),
         row=1,
@@ -83,7 +96,7 @@ def build_physics_comparison_figure(
             x=time_s,
             y=[frame.grasp_constraint_error_m * 1000.0 for frame in physics.frames],
             mode="lines",
-            line={"color": "#e89a36", "width": 2.5},
+            line={"color": AMBER, "width": 2.5},
             name="抓持誤差 (mm)",
         ),
         row=1,
@@ -94,7 +107,7 @@ def build_physics_comparison_figure(
             x=time_s,
             y=[frame.potential_energy_j for frame in physics.frames],
             mode="lines",
-            line={"color": "#2787c7", "width": 2.5},
+            line={"color": BLUE, "width": 2.5},
             name="位能 (J)",
         ),
         row=2,
@@ -105,7 +118,7 @@ def build_physics_comparison_figure(
             x=time_s,
             y=[frame.kinetic_energy_j for frame in physics.frames],
             mode="lines",
-            line={"color": "#675d9b", "width": 2.5},
+            line={"color": VIOLET, "width": 2.5},
             name="動能 (J)",
         ),
         row=2,
@@ -113,21 +126,40 @@ def build_physics_comparison_figure(
     )
     figure.update_scenes(
         aspectmode="data",
-        xaxis_title="X (m)",
-        yaxis_title="Y (m)",
-        zaxis_title="Z (m)",
+        xaxis=scene_axes("X（m）"),
+        yaxis=scene_axes("Y（m）"),
+        zaxis=scene_axes("Z（m）"),
         camera={"eye": {"x": 1.45, "y": -1.55, "z": 1.1}},
+        bgcolor="#F4F7F6",
+        dragmode="orbit",
     )
     figure.update_xaxes(title_text="時間 (s)", row=1, col=2)
     figure.update_xaxes(title_text="時間 (s)", row=2, col=2)
     figure.update_yaxes(title_text="N / mm", row=1, col=2)
     figure.update_yaxes(title_text="J", row=2, col=2)
+    figure.update_xaxes(
+        gridcolor=SCANLINE,
+        linecolor=SLATE,
+        tickfont={"family": MONO_FONT, "size": 9, "color": SLATE},
+    )
+    figure.update_yaxes(
+        gridcolor=SCANLINE,
+        linecolor=SLATE,
+        tickfont={"family": MONO_FONT, "size": 9, "color": SLATE},
+    )
     figure.update_layout(
-        height=760,
-        margin={"l": 16, "r": 16, "t": 58, "b": 36},
-        paper_bgcolor="#f7fafb",
-        plot_bgcolor="#f7fafb",
-        legend={"orientation": "h", "y": -0.08},
+        **instrument_layout(
+            height=760,
+            margin={"l": 16, "r": 16, "t": 58, "b": 52},
+        ),
+        legend={
+            "orientation": "h",
+            "y": -0.08,
+            "bgcolor": "rgba(244,247,246,0.88)",
+            "bordercolor": SCANLINE,
+            "borderwidth": 1,
+            "font": {"size": 10},
+        },
     )
     return figure
 

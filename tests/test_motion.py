@@ -99,4 +99,8 @@ def test_motion_figure_contains_all_animation_frames(
     )
     assert len(figure.frames) == len(motion_trajectory.frames)
     assert figure.layout.updatemenus[0].buttons[0].label == "▶ 播放"
+    assert figure.layout.updatemenus[0].buttons[2].label == "↺ 從頭"
     assert figure.frames[-1].data[2].text[0].startswith("安全退回")
+    assert figure.frames[-1].data[4].name == "軟管夾取節點"
+    assert figure.frames[-1].data[5].name == "TCP 已走路徑"
+    assert len(figure.frames[-1].data[5].x) == len(motion_trajectory.frames)

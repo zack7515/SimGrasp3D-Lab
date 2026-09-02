@@ -10,6 +10,20 @@ import plotly.graph_objects as go
 from simgrasp3d.models.motion import PipeObstacleSpec, TrajectoryData, TrajectoryFrame
 from simgrasp3d.models.specs import RobotSpec, TableSpec
 from simgrasp3d.robot.collision import build_robot_capsules
+from simgrasp3d.visualization.theme import (
+    AMBER,
+    CERAMIC,
+    FAULT,
+    LASER,
+    LASER_DARK,
+    MONO_FONT,
+    SCANLINE,
+    SLATE,
+    TITANIUM,
+    VACUUM,
+    instrument_layout,
+    scene_axes,
+)
 
 
 def _rgb(color: tuple[float, float, float]) -> str:
@@ -19,18 +33,19 @@ def _rgb(color: tuple[float, float, float]) -> str:
 
 def _status_color(frame: TrajectoryFrame, safe_clearance_m: float) -> str:
     if frame.collision:
-        return "#d85c4a"
+        return FAULT
     if frame.minimum_clearance_m < safe_clearance_m:
-        return "#e89a36"
-    return "#18ad9c"
+        return AMBER
+    return LASER
 
 
 def _dynamic_traces(
     frame: TrajectoryFrame,
     trajectory: TrajectoryData,
     robot: RobotSpec,
+    frame_index: int,
 ) -> list[go.Scatter3d]:
-    """建立單幀的機械臂、軟管、TCP 與夾爪代理幾何。"""
+    """建立單幀的機械臂、軟管、TCP、夾取點與歷史軌跡。"""
 
     status_color = _status_color(frame, trajectory.spec.safe_clearance_m)
     joints = frame.robot_joint_positions
@@ -54,9 +69,20 @@ def _dynamic_traces(
         gripper_y.extend((float(part.start[1]), float(part.end[1]), None))
         gripper_z.extend((float(part.start[2]), float(part.end[2]), None))
     attached_label = "已附著" if frame.attached else "未附著"
-    hose_status_color = "#e89a36" if frame.hose_clearance_m <= 0.001 else _rgb(
+    hose_status_color = AMBER if frame.hose_clearance_m <= 0.001 else _rgb(
         trajectory.spec.hose.color
     )
+    grasp_node = nodes[trajectory.spec.hose.grasp_node_index]
+    history = np.asarray(
+        [item.tcp_position for item in trajectory.frames[: frame_index + 1]],
+        dtype=np.float64,
+    )
+    physics_detail = ""
+    if trajectory.physics_engine is not None:
+        physics_detail = (
+            f"<br>抽樣接觸力={frame.maximum_contact_force_n:.2f} N"
+            f"<br>抓持誤差={frame.grasp_constraint_error_m * 1000.0:.2f} mm"
+        )
     return [
         go.Scatter3d(
             x=joints[:, 0],
@@ -64,8 +90,8 @@ def _dynamic_traces(
             z=joints[:, 2],
             mode="lines+markers",
             name="機械臂骨架",
-            line={"color": "#263746", "width": 10},
-            marker={"size": 5, "color": "#e4b44c"},
+            line={"color": TITANIUM, "width": 10},
+            marker={"size": 5, "color": AMBER},
             hovertemplate="關節座標<br>x=%{x:.3f}<br>y=%{y:.3f}<br>z=%{z:.3f} m<extra></extra>",
         ),
         go.Scatter3d(
@@ -92,7 +118,8 @@ def _dynamic_traces(
                 f"狀態：{attached_label}<br>機器人距離={frame.minimum_clearance_m * 1000.0:.2f} mm<br>"
                 f"最近：{frame.closest_collision_pair}<br>"
                 f"IK 位置={frame.ik_position_error_m * 1000.0:.2f} mm<br>"
-                f"IK 姿態={frame.ik_orientation_error_deg:.2f}°<extra></extra>"
+                f"IK 姿態={frame.ik_orientation_error_deg:.2f}°"
+                f"{physics_detail}<extra></extra>"
             ),
         ),
         go.Scatter3d(
@@ -101,8 +128,34 @@ def _dynamic_traces(
             z=gripper_z,
             mode="lines",
             name="夾爪代理",
-            line={"color": "#f4f7f8", "width": 12},
+            line={"color": "#FFFFFF", "width": 12},
             hovertemplate=f"夾爪開口={frame.gripper_opening_m * 1000.0:.1f} mm<extra></extra>",
+        ),
+        go.Scatter3d(
+            x=[grasp_node[0]],
+            y=[grasp_node[1]],
+            z=[grasp_node[2]],
+            mode="markers",
+            name="軟管夾取節點",
+            marker={
+                "size": 8,
+                "color": LASER if frame.attached else AMBER,
+                "line": {"color": "#FFFFFF", "width": 2},
+            },
+            hovertemplate=(
+                f"夾取節點 {trajectory.spec.hose.grasp_node_index}<br>"
+                f"狀態：{attached_label}<extra></extra>"
+            ),
+        ),
+        go.Scatter3d(
+            x=history[:, 0],
+            y=history[:, 1],
+            z=history[:, 2],
+            mode="lines",
+            name="TCP 已走路徑",
+            line={"color": LASER_DARK, "width": 4},
+            opacity=0.72,
+            hoverinfo="skip",
         ),
     ]
 
@@ -119,8 +172,8 @@ def _table_trace(table: TableSpec) -> go.Mesh3d:
         j=[1, 2],
         k=[2, 3],
         name="工作桌面",
-        color="#d8e1e4",
-        opacity=0.52,
+        color=SCANLINE,
+        opacity=0.46,
         hoverinfo="skip",
     )
 
@@ -180,7 +233,8 @@ def build_motion_figure(
     """建立含播放鍵、逐幀滑桿與安全狀態的 3D 動畫。"""
 
     first = trajectory.frames[0]
-    figure = go.Figure(data=_dynamic_traces(first, trajectory, robot))
+    figure = go.Figure(data=_dynamic_traces(first, trajectory, robot, 0))
+    dynamic_trace_count = len(figure.data)
     figure.add_trace(_table_trace(table))
 
     for obstacle in trajectory.spec.obstacles:
@@ -197,11 +251,11 @@ def build_motion_figure(
             z=keyframe_positions[:, 2],
             mode="lines+markers",
             name="TCP 規劃路徑",
-            line={"color": "#718592", "width": 4, "dash": "dash"},
+            line={"color": SLATE, "width": 4, "dash": "dash"},
             marker={
                 "size": 4,
                 "color": [
-                    "#e89a36" if keyframe.generated else "#718592"
+                    AMBER if keyframe.generated else SLATE
                     for keyframe in trajectory.planned_keyframes
                 ],
             },
@@ -218,7 +272,7 @@ def build_motion_figure(
             z=np.full_like(angles, table.pose.xyz[2] + table.size[2] / 2.0 + 0.003),
             mode="lines",
             name="放置目標區",
-            line={"color": "#18ad9c", "width": 6},
+            line={"color": LASER, "width": 6},
             hovertemplate="軟管放置目標區<extra></extra>",
         )
     )
@@ -227,8 +281,8 @@ def build_motion_figure(
     figure.frames = tuple(
         go.Frame(
             name=f"{index:04d}",
-            data=_dynamic_traces(frame, trajectory, robot),
-            traces=[0, 1, 2, 3],
+            data=_dynamic_traces(frame, trajectory, robot, index),
+            traces=list(range(dynamic_trace_count)),
         )
         for index, frame in enumerate(trajectory.frames)
     )
@@ -256,25 +310,41 @@ def build_motion_figure(
 
     metrics = trajectory.metrics
     figure.update_layout(
-        template="plotly_white",
-        height=720,
-        margin={"l": 0, "r": 0, "t": 45, "b": 100},
-        paper_bgcolor="#f7fafb",
-        plot_bgcolor="#f7fafb",
-        legend={"x": 0.01, "y": 0.99, "bgcolor": "rgba(255,255,255,0.80)"},
+        **instrument_layout(
+            height=720,
+            margin={"l": 0, "r": 0, "t": 38, "b": 108},
+        ),
+        uirevision="motion-camera",
+        legend={
+            "x": 0.01,
+            "y": 0.99,
+            "bgcolor": "rgba(244,247,246,0.88)",
+            "bordercolor": SCANLINE,
+            "borderwidth": 1,
+            "font": {"size": 10},
+        },
         scene={
-            "xaxis": {"title": "X（m）", "range": [-0.78, 0.76]},
-            "yaxis": {"title": "Y（m）", "range": [-0.58, 0.58]},
-            "zaxis": {"title": "Z（m）", "range": [0.0, 0.86]},
+            "uirevision": "motion-camera",
+            "xaxis": scene_axes("X（m）", [-0.78, 0.76]),
+            "yaxis": scene_axes("Y（m）", [-0.58, 0.58]),
+            "zaxis": scene_axes("Z（m）", [0.0, 0.86]),
             "aspectmode": "manual",
             "aspectratio": {"x": 1.55, "y": 1.15, "z": 0.86},
             "camera": {"eye": {"x": 1.45, "y": -1.55, "z": 1.05}},
-            "bgcolor": "#f2f6f7",
+            "bgcolor": CERAMIC,
+            "dragmode": "orbit",
         },
         sliders=[
             {
                 "active": 0,
-                "currentvalue": {"prefix": "FRAME / ", "font": {"size": 12, "color": "#263746"}},
+                "currentvalue": {
+                    "prefix": "TIME / ",
+                    "font": {"family": MONO_FONT, "size": 11, "color": TITANIUM},
+                },
+                "activebgcolor": LASER,
+                "bgcolor": SCANLINE,
+                "bordercolor": "#A7B7B3",
+                "font": {"family": MONO_FONT, "size": 9, "color": SLATE},
                 "pad": {"t": 45, "b": 5},
                 "steps": slider_steps,
             }
@@ -286,6 +356,9 @@ def build_motion_figure(
                 "x": 0.0,
                 "y": -0.09,
                 "showactive": False,
+                "bgcolor": VACUUM,
+                "bordercolor": VACUUM,
+                "font": {"family": MONO_FONT, "size": 10, "color": "#FFFFFF"},
                 "buttons": [
                     {
                         "label": "▶ 播放",
@@ -311,6 +384,21 @@ def build_motion_figure(
                             },
                         ],
                     },
+                    {
+                        "label": "↺ 從頭",
+                        "method": "animate",
+                        "args": [
+                            [item.name for item in figure.frames],
+                            {
+                                "frame": {
+                                    "duration": frame_duration_ms,
+                                    "redraw": True,
+                                },
+                                "mode": "immediate",
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                    },
                 ],
             }
         ],
@@ -328,7 +416,10 @@ def build_motion_figure(
                 "y": -0.08,
                 "xanchor": "right",
                 "showarrow": False,
-                "font": {"family": "monospace", "size": 11, "color": "#536777"},
+                "font": {"family": MONO_FONT, "size": 10, "color": SLATE},
+                "bgcolor": "rgba(244,247,246,0.82)",
+                "bordercolor": SCANLINE,
+                "borderwidth": 1,
             }
         ],
     )

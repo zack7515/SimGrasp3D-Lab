@@ -33,10 +33,14 @@ def test_report_contains_all_views_scenario_and_metrics(
     assert 'id="world-view"' in content
     assert 'id="sensor-view"' in content
     assert 'id="motion-view"' in content
-    assert "世界、感知、物理與控制驗證" in content
+    assert "從世界座標到安全命令" in content
     assert "固定 eye-to-hand / 靜態桌面" in content
     assert "軟管抽取與搬運時間序列" in content
     assert "KINEMATIC LEARNING" in content
+    assert 'class="signal-path"' in content
+    assert 'class="chapter-nav"' in content
+    assert "prefers-reduced-motion" in content
+    assert "檢查全部 RGB-D 量測指標" in content
     assert "collision_frame_count" in content
     assert "7.71 mm" in content
     assert "19.84 mm" in content

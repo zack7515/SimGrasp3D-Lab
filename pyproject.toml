@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simgrasp3d-lab"
-version = "0.8.0"
+version = "0.9.0"
 description = "以 Python 學習 3D 感知、柔性物理、機械手與安全抓取模擬"
 readme = "README.md"
 requires-python = ">=3.11"

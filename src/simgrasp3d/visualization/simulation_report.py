@@ -19,41 +19,70 @@ from simgrasp3d.visualization.perception_viewer import build_perception_figure
 from simgrasp3d.visualization.physics_viewer import build_physics_comparison_figure
 from simgrasp3d.visualization.plotly_viewer import build_figure
 from simgrasp3d.visualization.rgbd_viewer import build_rgbd_comparison_figure
+from simgrasp3d.visualization.theme import CERAMIC
 
 
 _REPORT_CSS = """
 :root {
-  --graphite: #101820;
-  --steel: #263746;
-  --slate: #536777;
-  --ice: #edf4f6;
-  --paper: #f8fbfc;
-  --cyan: #18ad9c;
-  --cyan-soft: #d9f2ed;
-  --amber: #e89a36;
-  --amber-soft: #fff0d9;
-  --danger: #d85c4a;
-  --line: #cbd8dd;
+  --graphite: #11181d;
+  --steel: #2a3942;
+  --slate: #60727a;
+  --ice: #e9efed;
+  --paper: #f4f7f6;
+  --cyan: #0aa58f;
+  --cyan-dark: #087568;
+  --cyan-soft: #d8eee9;
+  --amber: #e7a33b;
+  --amber-soft: #faecd4;
+  --danger: #c54437;
+  --line: #d6e0de;
+  --display: "Bahnschrift SemiCondensed", "DIN Alternate", "Arial Narrow", sans-serif;
+  --body: Aptos, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --mono: "JetBrains Mono", "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
 }
 
 * { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
 
 body {
   margin: 0;
   color: var(--graphite);
   background:
-    linear-gradient(rgba(38, 55, 70, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(38, 55, 70, 0.045) 1px, transparent 1px),
+    linear-gradient(rgba(42, 57, 66, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(42, 57, 66, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 50% -18%, rgba(10, 165, 143, 0.12), transparent 34%),
     var(--ice);
-  background-size: 24px 24px;
-  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  background-size: 40px 40px, 40px 40px, auto, auto;
+  font-family: var(--body);
+  line-height: 1.5;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: 8px;
+  left: 8px;
+  padding: 9px 12px;
+  color: var(--graphite);
+  background: #ffd966;
+  border-bottom: 4px solid var(--graphite);
+  transform: translateY(-160%);
+}
+
+.skip-link:focus { transform: translateY(0); }
+
+a:focus-visible,
+summary:focus-visible {
+  outline: 3px solid #ffd966;
+  outline-offset: 3px;
 }
 
 .instrument-bar {
   color: #f5fbfc;
   background: var(--graphite);
-  border-bottom: 4px solid var(--cyan);
-  padding: 22px clamp(20px, 3vw, 46px) 20px;
+  border-bottom: 1px solid #354852;
+  padding: 24px clamp(20px, 3vw, 46px) 18px;
 }
 
 .instrument-grid {
@@ -69,7 +98,7 @@ body {
 .metric-label,
 .condition-label,
 .rail-label {
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-family: var(--mono);
   letter-spacing: 0.11em;
   text-transform: uppercase;
 }
@@ -83,12 +112,12 @@ body {
 h1 {
   margin: 0;
   max-width: 900px;
-  font-family: "DIN Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  font-family: var(--display);
   font-size: clamp(30px, 4vw, 58px);
   font-stretch: condensed;
   font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 0.98;
+  letter-spacing: -0.018em;
+  line-height: 0.96;
 }
 
 .run-state {
@@ -114,8 +143,141 @@ h1 {
 .state-cell .meta-value {
   margin-top: 4px;
   color: #ffffff;
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-family: var(--mono);
   font-size: 13px;
+}
+
+.signal-path {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid #354852;
+  overflow: hidden;
+}
+
+.signal-path::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  right: 7%;
+  left: 7%;
+  height: 1px;
+  background: #49606c;
+}
+
+.signal-pulse {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  left: 7%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #b7fff3;
+  box-shadow: 0 0 0 4px rgba(10, 165, 143, 0.18), 0 0 18px #0aa58f;
+  animation: calibrate-signal 5.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.signal-node {
+  position: relative;
+  z-index: 3;
+  padding: 0 12px;
+  text-align: center;
+}
+
+.signal-node::before {
+  content: "";
+  display: block;
+  width: 9px;
+  height: 9px;
+  margin: 2px auto 8px;
+  border: 2px solid #8ca0a9;
+  border-radius: 50%;
+  background: var(--graphite);
+}
+
+.signal-node.is-live::before { border-color: #7ee5d6; background: var(--cyan); }
+.signal-node.is-fault::before { border-color: #ff9c90; background: var(--danger); }
+
+.signal-node span,
+.signal-node strong { display: block; }
+
+.signal-node span {
+  color: #879ba5;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+
+.signal-node strong {
+  margin-top: 2px;
+  color: #edf7f4;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+@keyframes calibrate-signal {
+  0%, 8% { left: 7%; opacity: 0; }
+  14% { opacity: 1; }
+  86% { opacity: 1; }
+  94%, 100% { left: calc(93% - 9px); opacity: 0; }
+}
+
+.chapter-nav {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--stage-count), minmax(90px, 1fr));
+  width: min(1920px, 100%);
+  margin: 0 auto;
+  padding: 0 clamp(12px, 2vw, 30px);
+  background: rgba(233, 239, 237, 0.94);
+  border-bottom: 1px solid #bdcac7;
+  backdrop-filter: blur(14px);
+}
+
+.chapter-nav a {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  color: var(--slate);
+  border-right: 1px solid var(--line);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.chapter-nav a:first-child { border-left: 1px solid var(--line); }
+
+.chapter-nav a::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  bottom: -1px;
+  left: 14px;
+  height: 3px;
+  background: transparent;
+}
+
+.chapter-nav a:hover,
+.chapter-nav a.is-active { color: var(--graphite); }
+.chapter-nav a.is-active::after { background: var(--cyan); }
+
+.chapter-nav span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  color: #ffffff;
+  background: var(--steel);
+  font-family: var(--mono);
+  font-size: 9px;
 }
 
 main {
@@ -135,8 +297,8 @@ main {
   min-width: 0;
   padding: 13px 16px;
   border: 1px solid var(--line);
-  background: rgba(248, 251, 252, 0.92);
-  box-shadow: 0 8px 24px rgba(16, 24, 32, 0.06);
+  background: rgba(244, 247, 246, 0.94);
+  box-shadow: 0 6px 18px rgba(17, 24, 29, 0.05);
 }
 
 .context-card h2 {
@@ -211,9 +373,10 @@ main {
 .pane {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid #b9c9cf;
+  border: 1px solid #bac8c5;
   background: var(--paper);
-  box-shadow: 0 14px 35px rgba(16, 24, 32, 0.10);
+  box-shadow: 0 12px 30px rgba(17, 24, 29, 0.08);
+  scroll-margin-top: 62px;
 }
 
 .pane-header {
@@ -247,7 +410,9 @@ main {
 
 .pane-header h2 {
   margin: 0;
+  font-family: var(--display);
   font-size: 15px;
+  letter-spacing: 0.015em;
 }
 
 .pane-header p {
@@ -261,7 +426,7 @@ main {
   padding: 5px 8px;
   color: #116e63;
   background: var(--cyan-soft);
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-family: var(--mono);
   font-size: 10px;
 }
 
@@ -273,7 +438,7 @@ main {
 .plot-shell {
   width: 100%;
   min-height: 650px;
-  background: #f7fafb;
+  background: var(--paper);
 }
 
 .plot-shell > div { width: 100% !important; }
@@ -281,8 +446,9 @@ main {
 .results {
   margin-top: 14px;
   border: 1px solid var(--line);
-  background: rgba(248, 251, 252, 0.96);
-  box-shadow: 0 10px 30px rgba(16, 24, 32, 0.07);
+  background: rgba(244, 247, 246, 0.97);
+  box-shadow: 0 8px 24px rgba(17, 24, 29, 0.06);
+  scroll-margin-top: 62px;
 }
 
 .results-header {
@@ -296,6 +462,7 @@ main {
 
 .results-header h2 {
   margin: 0;
+  font-family: var(--display);
   font-size: 16px;
 }
 
@@ -330,14 +497,14 @@ main {
 .metric-value {
   display: block;
   margin-top: 7px;
-  font-family: "DIN Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  font-family: var(--display);
   font-size: clamp(24px, 2vw, 34px);
   font-weight: 700;
   line-height: 1;
 }
 
-.metric.accent .metric-value { color: #0f8175; }
-.metric.warning .metric-value { color: #b36d17; }
+.metric.accent .metric-value { color: var(--cyan-dark); }
+.metric.warning .metric-value { color: #9b6517; }
 
 .metric-table-wrap {
   overflow-x: auto;
@@ -360,15 +527,17 @@ main {
 .metric-table th {
   width: 34%;
   color: var(--slate);
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-family: var(--mono);
   font-size: 10px;
   font-weight: 500;
 }
 
 .metric-table td {
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
+
+.metric-table tbody tr:hover { background: rgba(10, 165, 143, 0.055); }
 
 .report-note {
   margin: 12px 2px 0;
@@ -416,14 +585,13 @@ main {
   place-items: center;
   color: #ffffff;
   background: var(--steel);
-  border-radius: 50%;
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-family: var(--mono);
   font-size: 9px;
 }
 
 .motion-plot {
   min-height: 720px;
-  background: #f7fafb;
+  background: var(--paper);
 }
 
 .motion-plot > div { width: 100% !important; }
@@ -437,6 +605,55 @@ main {
   line-height: 1.6;
 }
 
+.metric-disclosure {
+  border-top: 1px solid var(--line);
+  background: #eef3f1;
+}
+
+.metric-disclosure summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 16px;
+  color: var(--steel);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  list-style: none;
+}
+
+.metric-disclosure summary::-webkit-details-marker { display: none; }
+.metric-disclosure summary::after { content: "+ 展開"; color: var(--cyan-dark); }
+.metric-disclosure[open] summary::after { content: "− 收合"; }
+.metric-disclosure[open] summary { border-bottom: 1px solid var(--line); }
+
+.gate-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  color: #ffffff;
+  background: var(--cyan-dark);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.gate-banner.is-fault { background: var(--danger); }
+.gate-banner strong { font-size: 13px; letter-spacing: 0.08em; }
+
+body.motion-ready .reveal {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
+body.motion-ready .reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 420ms ease-out, transform 520ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
 @media (max-width: 1180px) {
   .workbench,
   .context-strip { grid-template-columns: 1fr; }
@@ -444,6 +661,8 @@ main {
   .metric-grid { grid-template-columns: repeat(3, 1fr); }
   .metric:nth-child(3) { border-right: 0; }
   .metric:nth-child(-n + 3) { border-bottom: 1px solid var(--line); }
+  .chapter-nav { overflow-x: auto; justify-content: start; }
+  .chapter-nav a { min-width: 112px; }
 }
 
 @media (max-width: 680px) {
@@ -458,10 +677,20 @@ main {
   .pane-badge { display: none; }
   .plot-shell { min-height: 560px; }
   .motion-plot { min-height: 620px; }
+  .signal-node { padding: 0 3px; }
+  .signal-node span { font-size: 7px; }
+  .signal-node strong { font-size: 8px; }
+  .chapter-nav { padding: 0 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  body.motion-ready .reveal { opacity: 1; transform: none; }
 }
 """
 
@@ -644,7 +873,7 @@ def _motion_section(
         )
     )
     return f"""
-    <section class="pane motion-section" aria-label="軟管夾取連續動作動畫">
+    <section id="stage-motion" data-stage="C" class="pane motion-section reveal" aria-label="軟管夾取連續動作動畫">
       <header class="pane-header">
         <div class="pane-title"><span class="pane-code">C</span><div><h2>軟管抽取與搬運時間序列</h2><p>{escape(subtitle)}</p></div></div>
         <span class="pane-badge">{section_badge}</span>
@@ -652,12 +881,13 @@ def _motion_section(
       <div class="phase-rail" aria-label="動作階段">{phase_rail}</div>
       <div class="motion-plot">{motion_html}</div>
       <div class="metric-grid">{motion_cards}</div>
-      <div class="metric-table-wrap">
-        <table class="metric-table">
+      <details class="metric-disclosure">
+        <summary>檢查全部動作與安全指標</summary>
+        <div class="metric-table-wrap"><table class="metric-table">
           <thead><tr><th>運動指標</th><th>顯示值</th><th>資料欄位</th></tr></thead>
           <tbody>{_motion_metric_table(trajectory)}</tbody>
-        </table>
-      </div>
+        </table></div>
+      </details>
       <div class="motion-note">資料來源：{escape(engine_label)}。TCP 橘／紅色代表機器人低於 {trajectory.spec.safe_clearance_m * 1000.0:.1f} mm 或穿透；軟管節點橘色表示與管路進入 1 mm 接觸帶。規劃器插入的 waypoint 以橘色路徑節點顯示。</div>
     </section>
     """
@@ -761,17 +991,20 @@ def _physics_section(
         or key == "maximum_hose_speed_m_s"
     }
     return f"""
-    <section class="pane analysis-section" aria-label="MuJoCo 軟管物理與敏感度">
+    <section id="stage-physics" data-stage="D" class="pane analysis-section reveal" aria-label="MuJoCo 軟管物理與敏感度">
       <header class="pane-header">
         <div class="pane-title"><span class="pane-code">D</span><div><h2>MuJoCo 軟管接觸物理</h2><p>cable 彎曲／扭轉、摩擦、接觸力、能量與 solver sensitivity</p></div></div>
         <span class="pane-badge">PHYSICS BASELINE</span>
       </header>
       <div class="motion-plot">{physics_html}</div>
       <div class="metric-grid">{cards}</div>
-      <div class="metric-table-wrap">
-        <table class="metric-table"><thead><tr><th>物理指標</th><th>顯示值</th><th>資料欄位</th></tr></thead>
-        <tbody>{_analysis_metric_rows(physics_only_metrics, labels)}</tbody></table>
-      </div>
+      <details class="metric-disclosure">
+        <summary>檢查全部接觸與能量指標</summary>
+        <div class="metric-table-wrap"><table class="metric-table">
+          <thead><tr><th>物理指標</th><th>顯示值</th><th>資料欄位</th></tr></thead>
+          <tbody>{_analysis_metric_rows(physics_only_metrics, labels)}</tbody>
+        </table></div>
+      </details>
       <div class="metric-table-wrap">
         <table class="metric-table"><thead><tr><th>敏感度案例</th><th>步長</th><th>彎曲參數</th><th>摩擦</th><th>最終形狀差</th><th>抽樣接觸力</th></tr></thead>
         <tbody>{case_rows}</tbody></table>
@@ -826,16 +1059,20 @@ def _perception_section(
         "feasible_grasp_candidate_count": "幾何可行候選數",
     }
     return f"""
-    <section class="pane analysis-section" aria-label="RGB-D 幾何與抓取候選">
+    <section id="stage-perception" data-stage="E" class="pane analysis-section reveal" aria-label="RGB-D 幾何與抓取候選">
       <header class="pane-header">
         <div class="pane-title"><span class="pane-code">E</span><div><h2>RGB-D 幾何與抓取候選</h2><p>RANSAC 桌面、oracle instance baseline、AABB／OBB、法向與 top-down grasp</p></div></div>
         <span class="pane-badge">PERCEPTION BASELINE</span>
       </header>
       <div class="motion-plot">{perception_html}</div>
       <div class="metric-grid">{cards}</div>
-      <div class="metric-table-wrap"><table class="metric-table">
-        <thead><tr><th>感知指標</th><th>顯示值</th><th>資料欄位</th></tr></thead>
-        <tbody>{_analysis_metric_rows(metrics, labels)}</tbody></table></div>
+      <details class="metric-disclosure">
+        <summary>檢查全部桌面與抓取幾何指標</summary>
+        <div class="metric-table-wrap"><table class="metric-table">
+          <thead><tr><th>感知指標</th><th>顯示值</th><th>資料欄位</th></tr></thead>
+          <tbody>{_analysis_metric_rows(metrics, labels)}</tbody>
+        </table></div>
+      </details>
       <div class="motion-note">物件分割目前使用模擬 instance mask 作為 oracle baseline；桌面、包圍盒、法向與抓取幾何則由含雜訊 observation 計算，尚未宣稱未知物件分割能力。</div>
     </section>
     """
@@ -848,6 +1085,7 @@ def _integration_section(replay: ReplayResult | None) -> str:
         return ""
     status = "AUTHORIZED" if replay.execution_authorized else "ABORTED"
     status_class = "accent" if replay.execution_authorized else "warning"
+    gate_class = "" if replay.execution_authorized else " is-fault"
     selected_name = (
         "NONE"
         if replay.selected_grasp is None
@@ -881,15 +1119,20 @@ def _integration_section(replay: ReplayResult | None) -> str:
         "selected_grasp_clearance_m": "選定抓取最小距離",
     }
     return f"""
-    <section class="pane analysis-section" aria-label="安全閘門與控制重播">
+    <section id="stage-control" data-stage="F" class="pane analysis-section reveal" aria-label="安全閘門與控制重播">
       <header class="pane-header">
         <div class="pane-title"><span class="pane-code">F</span><div><h2>Fail-closed 規劃與控制重播</h2><p>感知候選 → IK → 碰撞 → 物理門檻 → JSONL 命令事件</p></div></div>
         <span class="pane-badge">{status}</span>
       </header>
+      <div class="gate-banner{gate_class}"><span>COMMAND GATE / {escape(failure_text)}</span><strong>{status}</strong></div>
       <div class="metric-grid">{cards}</div>
-      <div class="metric-table-wrap"><table class="metric-table">
-        <thead><tr><th>整合指標</th><th>顯示值</th><th>資料欄位</th></tr></thead>
-        <tbody>{_analysis_metric_rows(replay.metrics, labels)}</tbody></table></div>
+      <details class="metric-disclosure">
+        <summary>檢查全部安全閘門與事件指標</summary>
+        <div class="metric-table-wrap"><table class="metric-table">
+          <thead><tr><th>整合指標</th><th>顯示值</th><th>資料欄位</th></tr></thead>
+          <tbody>{_analysis_metric_rows(replay.metrics, labels)}</tbody>
+        </table></div>
+      </details>
       <div class="motion-note">安全閘門：{escape(failure_text)}。此 JSONL 是 message-neutral 離線重播，不會連線或命令真實機器；URDF／SRDF 僅含目前簡化幾何，接入 ROS 2／MoveIt 前仍需控制器與實機安全設定。</div>
     </section>
     """
@@ -913,14 +1156,14 @@ def write_simulation_report(
         title=None,
         height=650,
         margin={"l": 0, "r": 0, "t": 12, "b": 0},
-        paper_bgcolor="#f7fafb",
+        paper_bgcolor=CERAMIC,
     )
     sensor_figure = build_rgbd_comparison_figure(result)
     sensor_figure.update_layout(
         title=None,
         height=650,
         margin={"l": 28, "r": 70, "t": 54, "b": 28},
-        paper_bgcolor="#f7fafb",
+        paper_bgcolor=CERAMIC,
     )
     scene_html = to_html(
         scene_figure,
@@ -1001,6 +1244,33 @@ def write_simulation_report(
         if perception is not None
         else ""
     )
+    stages = [
+        ("A", "世界", "#stage-world"),
+        ("B", "感測", "#stage-sensor"),
+    ]
+    if displayed_trajectory is not None:
+        stages.append(("C", "動作", "#stage-motion"))
+    if trajectory is not None and physics_sweep is not None:
+        stages.append(("D", "物理", "#stage-physics"))
+    if perception is not None:
+        stages.append(("E", "抓取", "#stage-perception"))
+    if replay is not None:
+        stages.append(("F", "閘門", "#stage-control"))
+    stage_navigation = "".join(
+        f'<a href="{target}" data-nav-stage="{code}"><span>{code}</span>{label}</a>'
+        for code, label, target in stages
+    )
+    physics_signal = "CABLE ACTIVE" if physics_sweep is not None else "NOT RUN"
+    physics_signal_class = " is-live" if physics_sweep is not None else ""
+    if replay is None:
+        command_signal = "NOT EVALUATED"
+        command_signal_class = ""
+    elif replay.execution_authorized:
+        command_signal = "AUTHORIZED"
+        command_signal_class = " is-live"
+    else:
+        command_signal = "ABORTED"
+        command_signal_class = " is-fault"
     page_title = f"SimGrasp3D｜{spec.name}｜模擬驗證報告"
     document = f"""<!doctype html>
 <html lang="zh-Hant">
@@ -1012,11 +1282,12 @@ def write_simulation_report(
   <script>{get_plotlyjs()}</script>
 </head>
 <body>
+  <a class="skip-link" href="#report-main">跳到模擬結果</a>
   <header class="instrument-bar">
     <div class="instrument-grid">
       <div>
         <p class="eyebrow">SimGrasp3D / simulation validation</p>
-        <h1>世界、感知、物理與控制驗證</h1>
+        <h1>從世界座標到安全命令</h1>
       </div>
       <div class="run-state" aria-label="執行識別">
         <div class="state-cell"><span class="meta-label">Scene</span><span class="meta-value">{escape(spec.name)}</span></div>
@@ -1025,9 +1296,19 @@ def write_simulation_report(
         <div class="state-cell"><span class="meta-label">Points</span><span class="meta-value">{total_points:,}</span></div>
       </div>
     </div>
+    <div class="signal-path" aria-label="模擬資料處理鏈">
+      <span class="signal-pulse" aria-hidden="true"></span>
+      <div class="signal-node is-live"><span>01 / WORLD</span><strong>GEOMETRY READY</strong></div>
+      <div class="signal-node is-live"><span>02 / SENSOR</span><strong>RGB-D OBSERVED</strong></div>
+      <div class="signal-node{physics_signal_class}"><span>03 / PHYSICS</span><strong>{physics_signal}</strong></div>
+      <div class="signal-node{command_signal_class}"><span>04 / COMMAND</span><strong>{command_signal}</strong></div>
+    </div>
   </header>
-  <main>
-    <section class="context-strip" aria-label="測試情境與條件">
+  <nav class="chapter-nav" style="--stage-count: {len(stages)}" aria-label="驗證階段導覽">
+    {stage_navigation}
+  </nav>
+  <main id="report-main">
+    <section class="context-strip reveal" aria-label="測試情境與條件">
       <div class="context-card">
         <h2>測試情境</h2>
         <div class="condition-list">
@@ -1043,7 +1324,7 @@ def write_simulation_report(
       </div>
     </section>
 
-    <section class="workbench" aria-label="原始場景與感測結果雙畫面比較">
+    <section id="stage-world" data-stage="A" class="workbench reveal" aria-label="原始場景與感測結果雙畫面比較">
       <div class="calibration-rail"><span class="rail-label">WORLD → SENSOR</span></div>
       <article class="pane world">
         <header class="pane-header">
@@ -1052,7 +1333,7 @@ def write_simulation_report(
         </header>
         <div class="plot-shell">{scene_html}</div>
       </article>
-      <article class="pane sensor">
+      <article id="stage-sensor" class="pane sensor">
         <header class="pane-header">
           <div class="pane-title"><span class="pane-code">B</span><div><h2>相機測試結果</h2><p>理想深度、含誤差觀測、絕對誤差與 RGB</p></div></div>
           <span class="pane-badge">SENSOR OBSERVATION</span>
@@ -1061,23 +1342,69 @@ def write_simulation_report(
       </article>
     </section>
 
-    <section class="results" aria-label="全部量化測試結果">
+    <section class="results reveal" aria-label="全部量化測試結果">
       <header class="results-header"><h2>量化結果</h2><p>深度誤差只在 ground truth 與 observation 的共同有效像素計算</p></header>
       <div class="metric-grid">{metric_cards}</div>
-      <div class="metric-table-wrap">
-        <table class="metric-table">
+      <details class="metric-disclosure">
+        <summary>檢查全部 RGB-D 量測指標</summary>
+        <div class="metric-table-wrap"><table class="metric-table">
           <thead><tr><th>指標</th><th>顯示值</th><th>資料欄位</th></tr></thead>
           <tbody>{_metric_table(result)}</tbody>
-        </table>
-      </div>
+        </table></div>
+      </details>
     </section>
     {motion_section}
     {physics_section}
     {perception_section}
     {integration_section}
-    <p class="report-note">此頁是模擬結果，不是實機驗證。較大的深度邊界誤差會同時包含外參偏移後不同表面落入同一像素的影響；目前的影像填充率也受離散表面點數影響。</p>
+    <p class="report-note reveal">此頁是模擬結果，不是實機驗證。較大的深度邊界誤差會同時包含外參偏移後不同表面落入同一像素的影響；目前的影像填充率也受離散表面點數影響。</p>
   </main>
   <script>
+    document.body.classList.add("motion-ready");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const revealItems = document.querySelectorAll(".reveal");
+    if (reducedMotion || !("IntersectionObserver" in window)) {{
+      revealItems.forEach(function (item) {{ item.classList.add("is-visible"); }});
+    }} else {{
+      const revealObserver = new IntersectionObserver(function (entries, observer) {{
+        entries.forEach(function (entry) {{
+          if (entry.isIntersecting) {{
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }}
+        }});
+      }}, {{ rootMargin: "0px 0px -10% 0px", threshold: 0.08 }});
+      revealItems.forEach(function (item) {{ revealObserver.observe(item); }});
+    }}
+
+    const navLinks = document.querySelectorAll("[data-nav-stage]");
+    function activateStage(stage) {{
+      navLinks.forEach(function (link) {{
+        const active = link.dataset.navStage === stage;
+        link.classList.toggle("is-active", active);
+        if (active) {{
+          link.setAttribute("aria-current", "step");
+        }} else {{
+          link.removeAttribute("aria-current");
+        }}
+      }});
+    }}
+    if (navLinks.length) {{ activateStage(navLinks[0].dataset.navStage); }}
+    navLinks.forEach(function (link) {{
+      link.addEventListener("click", function () {{ activateStage(link.dataset.navStage); }});
+    }});
+    if ("IntersectionObserver" in window) {{
+      const stageObserver = new IntersectionObserver(function (entries) {{
+        const visible = entries
+          .filter(function (entry) {{ return entry.isIntersecting; }})
+          .sort(function (left, right) {{ return right.intersectionRatio - left.intersectionRatio; }});
+        if (visible.length) {{ activateStage(visible[0].target.dataset.stage); }}
+      }}, {{ rootMargin: "-15% 0px -62% 0px", threshold: [0.08, 0.25] }});
+      document.querySelectorAll("[data-stage]").forEach(function (item) {{
+        stageObserver.observe(item);
+      }});
+    }}
+
     window.addEventListener("load", function () {{
       window.setTimeout(function () {{
         Plotly.Plots.resize(document.getElementById("world-view"));

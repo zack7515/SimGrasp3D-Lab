@@ -7,6 +7,10 @@
 | 幾何/標定 | [OpenCV Camera Calibration and 3D Reconstruction](https://docs.opencv.org/4.13.0/d9/d0c/group__calib3d.html) | 內參、PnP、雙目與 hand-eye 的標準介面 |
 | 機器人模型 | [MoveIt URDF and SRDF](https://moveit.picknik.ai/main/doc/examples/urdf_srdf/urdf_srdf_tutorial.html) | URDF/SRDF、碰撞 mesh、end effector、自碰撞矩陣 |
 | 世界模型 | [MoveIt Perception Pipeline](https://moveit.picknik.ai/main/doc/examples/perception_pipeline/perception_pipeline_tutorial.html) | 點雲/深度圖、TF 與 OctoMap 整合 |
+| 機器人觀測介面 | [Foxglove Getting Started](https://docs.foxglove.dev/docs/getting-started-guide) | 同一時間軸的 3D、telemetry 與曲線多面板觀測方式 |
+| 模擬操作介面 | [Isaac Sim GUI Reference](https://docs.isaacsim.omniverse.nvidia.com/latest/gui/index.html) | viewport、Stage、Property Window 與用途導向 panel 的操作層次 |
+| 動畫圖形 | [Plotly Python Animations](https://plotly.com/python/animations/) | 固定視域、播放／暫停參數與 3D 動畫平滑轉場限制 |
+| 動態可及性 | [W3C Technique C39](https://www.w3.org/WAI/WCAG21/Techniques/css/C39.html) | 以 `prefers-reduced-motion` 尊重使用者的低動態偏好 |
 | 即時閉迴路 | [MoveIt Realtime Servo](https://moveit.picknik.ai/main/doc/examples/realtime_servo/realtime_servo_tutorial.html) | visual servo、奇異點、碰撞、平滑與關節限制 |
 | 手眼標定 | [Zivid Hand-Eye Calibration API](https://support.zivid.com/en/latest/camera/api-reference/hand-eye-calibration.html) | eye-in-hand/eye-to-hand 的 4×4 transform 定義與 residual |
 | 手眼驗證 | [Zivid Touch Test](https://support.zivid.com/en/v2.8/academy/applications/hand-eye/hand-eye-calibration-verification-via-touch-test.html) | 用實際 TCP 接觸驗證手眼結果 |
