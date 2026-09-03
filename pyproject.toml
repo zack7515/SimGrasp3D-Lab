@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10"]
+dev = ["pytest>=8,<10", "ruff>=0.6,<1"]
 
 [project.scripts]
 simgrasp3d = "simgrasp3d.cli:main"
@@ -31,3 +31,14 @@ where = ["src"]
 addopts = "-q"
 testpaths = ["tests"]
 
+[tool.ruff]
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# 全形標點與中文說明是本專案的既定風格；行寬對混排 CJK 的字元計數也沒有意義。
+# RUF046：本專案大量流通 numpy 純量，round() 不保證回傳 int，int() 轉型是必要的。
+ignore = ["E501", "RUF001", "RUF002", "RUF003", "RUF046"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["simgrasp3d"]
