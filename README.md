@@ -56,7 +56,7 @@ outputs/index.html
 2. 一次只修改一個滑桿，查看六道設計閘門與 3D 包絡如何變化。
 3. 進入 `outputs/simulation_report.html`，檢查 RGB-D、IK、碰撞、物理、感知與命令證據。
 4. 進入 `outputs/hospital/index.html`，依 H1～H7 觀察不同醫院情境需要補上的模型。
-5. 下載工作台產生的 JSON，作為下一次可重現的參數實驗。
+5. 下載工作台產生的 JSON，改回 `configs/` 後重新執行 `simgrasp3d`，用完整管線驗證工作台的估算。
 
 若只想先產生幾何、RGB-D 與系統設計頁面，可略過較耗時的物理與醫院案例：
 
@@ -132,6 +132,7 @@ ruff check .
 - 感知分割使用模擬 `instance_mask` 作為 oracle baseline，尚未接入真實 RGB-D 資料。
 - 軟管材料與摩擦參數尚未用實物校正。
 - waypoint 規劃器不是完整的連續 swept-volume 或 OMPL 規劃器。
+- 系統設計工作台的即時閘門是瀏覽器端的快速估算，與 Python 完整管線是兩份實作；頁面數值用來形成假設，結論仍以重新執行管線為準。
 - URDF／SRDF、命令與醫院案例皆為簡化教學模型，不會連接或控制真實設備。
 - 所有 `PASS` 只表示通過目前 JSON 中未校準的模擬門檻。
 

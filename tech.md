@@ -1,7 +1,7 @@
 # SimGrasp3D Lab 技術報告
 
 - 版本：`0.12.0`
-- 驗證基準：2026-09-02、固定亂數種子 `7515`
+- 驗證基準：2026-09-03、固定亂數種子 `7515`
 - 範圍：桌面 RGB-D 感知、六軸手臂、平行夾爪、柔性軟管、固定管路避障、MuJoCo 接觸物理與醫院情境教學。
 
 > 本報告描述目前程式實際實作與固定基準輸出。所有門檻皆為未經實機校正的教學設定，不構成工業安全、醫療器材或臨床有效性證明。
@@ -67,7 +67,7 @@ SimGrasp3D Lab 將「看見物件、規劃抓取、避開障礙、搬運柔性�
 | 感知 | 桌面、OBB、法向與抓取候選 | [`perception/geometry_pipeline.py`](src/simgrasp3d/perception/geometry_pipeline.py) |
 | 動作與物理 | 軟管幾何、waypoint、MuJoCo 與醫院案例 | [`simulation/`](src/simgrasp3d/simulation) |
 | 安全整合 | 門檻彙整、命令授權與 JSONL 重播 | [`integration/replay.py`](src/simgrasp3d/integration/replay.py) |
-| 輸出與介面 | NPZ／JSON／PLY 與自包含 HTML | [`io/`](src/simgrasp3d/io)、[`visualization/`](src/simgrasp3d/visualization) |
+| 輸出與介面 | NPZ／JSON／PLY 與共用離線 runtime 的 HTML | [`io/`](src/simgrasp3d/io)、[`visualization/`](src/simgrasp3d/visualization) |
 
 ## 4. 座標、單位與可重現性
 
@@ -77,6 +77,7 @@ SimGrasp3D Lab 將「看見物件、規劃抓取、避開障礙、搬運柔性�
 - 深度圖中的 `0` 代表無有效觀測。
 - 預設亂數種子為 `7515`，用於感測誤差與可重現案例。
 - `outputs/` 是執行產物而非來源；相同軟體版本、依賴與設定才是重現前提。
+- 所有頁面共用 `outputs/assets/plotly.min.js`，不連任何 CDN；離線瀏覽需整個 `outputs/` 目錄一起複製。
 
 ## 5. 方法
 
@@ -96,6 +97,8 @@ SimGrasp3D Lab 將「看見物件、規劃抓取、避開障礙、搬運柔性�
 | Path clearance | 抬升與搬運路徑是否保留安全淨空 | 可能碰撞固定管路 |
 
 這一層是瀏覽器中的快速幾何估算，用來形成假設與找出明顯不可行的設計；它不等同完整 IK、碰撞或 MuJoCo 驗證。
+
+為了在拖曳滑桿時即時更新，六道閘門在瀏覽器端以 JavaScript 重新實作了一次（[`visualization/static/design_lab.js`](src/simgrasp3d/visualization/static/design_lab.js)）。同一套幾何邏輯因此存在兩份實作：Python 管線是權威版本，JS 是估算版本。兩者共用的線段距離運算由 [`tests/test_design_lab_js.py`](tests/test_design_lab_js.py) 以 node 對隨機輸入比對；閘門公式本身仍只在 Python 端有測試，因此頁面上的數值應視為假設而非結論。
 
 ### 5.2 場景與機器人幾何
 
@@ -214,7 +217,7 @@ dq = J^T (J J^T + lambda^2 I)^-1 e
 | Hospital case | `1.0` | 固定時間、階段、GT／觀測 tracks、signals、metrics、events | 醫院案例比較 |
 | Replay | JSONL | frame、關節命令、夾爪命令、授權狀態 | 離線重播與稽核 |
 
-NPZ 儲存大型數值陣列，JSON 儲存指標與結構化中繼資料，PLY 提供點雲互通，HTML 則內嵌本次結果供瀏覽器檢查。資料讀寫實作位於 [`src/simgrasp3d/io/`](src/simgrasp3d/io)。
+NPZ 儲存大型數值陣列，JSON 儲存指標與結構化中繼資料，PLY 提供點雲互通，HTML 內嵌本次結果的數據與樣式、並以相對路徑載入共用的 Plotly runtime。資料讀寫實作位於 [`src/simgrasp3d/io/`](src/simgrasp3d/io)。
 
 ## 7. 固定基準結果
 
@@ -283,6 +286,8 @@ simgrasp3d
 simgrasp3d --no-simulate-physics --no-simulate-hospital
 ```
 
+完整流程在單機 CPU 約 14 秒完成，輸出約 15 MB，其中 4.7 MB 是所有頁面共用的 Plotly runtime；其餘時間主要由 MuJoCo 積分佔用。
+
 重要設定檔位於 [`configs/`](configs)。調整參數時建議一次只變更一項，保留產出 JSON，並比較指標與失敗碼，避免只依動畫外觀下結論。
 
 ## 9. 驗證策略
@@ -294,12 +299,14 @@ simgrasp3d --no-simulate-physics --no-simulate-hospital
 - FK／IK、機器人碰撞、waypoint 與軟管連續性。
 - MuJoCo 數值有限性、長度、接觸與敏感度。
 - 桌面、物件幾何、抓取候選與 fail-closed。
-- 醫院案例資料契約、主頁與自包含 HTML。
+- 醫院案例資料契約、主頁，以及頁面只載入存在的本機腳本。
+- 工作台 JS 與 Python 的線段距離實作對拍（需要 node，未安裝時自動略過）。
 
 執行方式：
 
 ```bash
 pytest
+ruff check .
 ```
 
 測試能防止已知行為回歸，但不取代真實感測、材料、設備、臨床或安全驗證。
@@ -314,6 +321,7 @@ pytest
 | P1 | 單一 detour waypoint | 複雜障礙下可能找不到可行路徑 | 接入 MoveIt／OMPL 並驗證連續碰撞 |
 | P1 | 簡化夾取 attachment | 無法表現局部壓縮與滑脫 | 建立夾爪接觸面、閉合控制與滑移指標 |
 | P1 | 缺少控制與感測延遲 | 動畫不代表閉迴路穩定 | 加入控制頻率、延遲、追蹤誤差與 replanning |
+| P2 | 工作台閘門在 JS 與 Python 各有一份實作 | 兩份公式可能分歧，頁面判定與完整管線不一致 | 把對拍範圍從線段距離擴大到六道閘門，或改由 Python 預先計算參數網格 |
 | P2 | 醫院案例未建模人體與流程 | 不能做臨床或法規推論 | 與領域專家定義 task、hazard、acceptance evidence |
 
 ## 11. 證據與延伸閱讀
