@@ -48,7 +48,7 @@ python scripts/run_scene.py
 outputs/index.html
 ```
 
-`outputs/` 是可重建產物，已由 Git 忽略。
+`outputs/` 是可重建產物，已由 Git 忽略。所有頁面共用 `outputs/assets/plotly.min.js`，不連 CDN，複製整個 `outputs/` 目錄即可離線瀏覽。
 
 ## 使用方式
 
@@ -109,6 +109,7 @@ SimGrasp3D-Lab/
 │   ├── simulation/          # 軟管、waypoint、MuJoCo 與醫院案例
 │   ├── integration/         # fail-closed 與離線重播
 │   ├── visualization/       # 主頁、工作台、動畫與報告
+│   │   └── static/          # 頁面 CSS 與瀏覽器端 JS
 │   └── io/                  # JSON、JSONL、NPZ 與 PLY 輸出
 ├── tests/                   # 單元與跨模組回歸測試
 ├── tech.md                  # 架構、方法、資料契約與基準技術報告
@@ -119,9 +120,12 @@ SimGrasp3D-Lab/
 
 ```bash
 pytest
+ruff check .
 ```
 
-測試涵蓋座標轉換、RGB-D、IK、碰撞、軟管連續性、MuJoCo、感知、fail-closed、醫院案例與自包含 HTML。
+測試涵蓋座標轉換、RGB-D、IK、碰撞、軟管連續性、MuJoCo、感知、fail-closed、醫院案例與離線 HTML。
+`tests/test_design_lab_js.py` 另外用 node 比對工作台 JS 與 Python 的線段距離實作，避免兩份幾何程式碼分歧；
+未安裝 node 時該項自動略過。
 
 ## 已知限制
 
