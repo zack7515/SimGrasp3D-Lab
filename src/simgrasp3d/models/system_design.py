@@ -7,7 +7,6 @@ from typing import Any
 
 import numpy as np
 
-
 _REQUIRED_PARAMETER_KEYS = {
     "camera_height_m",
     "camera_lateral_m",

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import json
+import itertools
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 
+from simgrasp3d.io import load_spec
 from simgrasp3d.models.hospital import (
     HospitalAsset,
     HospitalCaseResult,
@@ -18,7 +19,6 @@ from simgrasp3d.models.hospital import (
     HospitalSuiteSpec,
     HospitalTrack,
 )
-
 
 GRAPHITE = "#23323A"
 STEEL = "#71828A"
@@ -33,8 +33,7 @@ VIOLET = "#745B9E"
 def load_hospital_suite_spec(path: str | Path) -> HospitalSuiteSpec:
     """讀取並驗證 UTF-8 醫院案例設定。"""
 
-    with Path(path).open("r", encoding="utf-8") as stream:
-        return HospitalSuiteSpec.from_dict(json.load(stream))
+    return load_spec(path, HospitalSuiteSpec)
 
 
 def _smoothstep(value: np.ndarray) -> np.ndarray:
@@ -53,7 +52,7 @@ def _timeline(
     phases = [keyframes[0][0]]
     positions = [np.asarray(keyframes[0][2], dtype=np.float64)]
     elapsed = 0.0
-    for previous, target in zip(keyframes[:-1], keyframes[1:], strict=True):
+    for previous, target in itertools.pairwise(keyframes):
         duration = float(target[1])
         steps = max(1, int(round(duration * frame_rate_hz)))
         fractions = np.arange(1, steps + 1, dtype=np.float64) / steps
@@ -244,8 +243,8 @@ def _bedside_tubing(
     grasp = initial[grasp_index]
     time_s, phases, tcp = _timeline((
         ("辨識指定管路", 0.0, (-0.50, -0.44, 0.84)),
-        ("預抓取", 1.0, tuple(grasp + [0, 0, 0.18])),
-        ("夾取未連接管路", 0.6, tuple(grasp + [0, 0, 0.025])),
+        ("預抓取", 1.0, tuple(grasp + np.asarray([0.0, 0.0, 0.18]))),
+        ("夾取未連接管路", 0.6, tuple(grasp + np.asarray([0.0, 0.0, 0.025]))),
         ("抬升避開床欄", 1.0, (-0.02, -0.34, 0.84)),
         ("繞過監護線束", 1.2, (0.28, -0.36, 0.90)),
         ("移至管路固定夾", 1.1, (0.56, -0.30, 0.78)),

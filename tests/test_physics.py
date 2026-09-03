@@ -10,7 +10,6 @@ from simgrasp3d.models.motion import TrajectoryData
 from simgrasp3d.models.physics import PhysicsSweepCase, PhysicsSweepData
 from simgrasp3d.simulation.mujoco_hose import load_mujoco_hose_spec
 
-
 PHYSICS_CONFIG_PATH = Path("configs/physics/hose_mujoco_baseline.json")
 
 

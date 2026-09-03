@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import plotly.graph_objects as go
 
@@ -21,7 +19,6 @@ from simgrasp3d.visualization.theme import (
     instrument_layout,
     scene_axes,
 )
-
 
 _BOX_EDGES = (
     (0, 1),
@@ -187,20 +184,3 @@ def build_perception_figure(
     )
     return figure
 
-
-def write_perception_html(
-    frame: RGBDFrame,
-    result: PerceptionResult,
-    output_path: str | Path,
-) -> Path:
-    """輸出不依賴 CDN 的 perception 互動式 HTML。"""
-
-    destination = Path(output_path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    build_perception_figure(frame, result).write_html(
-        destination,
-        include_plotlyjs=True,
-        full_html=True,
-        config={"displaylogo": False, "responsive": True, "scrollZoom": True},
-    )
-    return destination

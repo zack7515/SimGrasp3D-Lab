@@ -11,7 +11,6 @@ from simgrasp3d.geometry.transforms import pose_matrix
 from simgrasp3d.models.specs import CameraSpec, SensorNoiseSpec
 from simgrasp3d.scene.builder import SceneData, camera_frame
 
-
 SCHEMA_VERSION = "1.0"
 
 

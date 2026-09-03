@@ -7,7 +7,6 @@ import numpy as np
 from simgrasp3d.io.point_cloud import export_scene_point_clouds
 from simgrasp3d.scene.builder import build_scene, load_scene_spec
 
-
 CONFIG_PATH = Path("configs/scenes/tabletop_demo.json")
 
 

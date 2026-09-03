@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import json
+import itertools
 from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 
 from simgrasp3d.geometry.collision import capsule_clearance, segment_distance
+from simgrasp3d.io import load_spec
 from simgrasp3d.models.motion import HoseMotionSpec, MotionKeyframeSpec
 from simgrasp3d.models.specs import SceneSpec
 from simgrasp3d.models.system_design import (
@@ -23,8 +24,7 @@ from simgrasp3d.simulation.waypoint_planner import plan_safe_waypoints
 def load_system_design_spec(path: str | Path) -> SystemDesignSpec:
     """讀取並驗證系統設計工作台 JSON。"""
 
-    with Path(path).open("r", encoding="utf-8") as stream:
-        return SystemDesignSpec.from_dict(json.load(stream))
+    return load_spec(path, SystemDesignSpec)
 
 
 def _resample_polyline(points: tuple[tuple[float, float, float], ...], count: int) -> np.ndarray:
@@ -181,7 +181,7 @@ def _planned_path(
 def _path_clearance(path: np.ndarray, motion: HoseMotionSpec, obstacles: tuple) -> float:
     radius = motion.waypoint_planner.tool_envelope_radius_m
     values: list[float] = []
-    for first, second in zip(path[:-1], path[1:], strict=True):
+    for first, second in itertools.pairwise(path):
         for obstacle in obstacles:
             values.append(
                 capsule_clearance(

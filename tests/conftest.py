@@ -1,5 +1,6 @@
-"""跨測試共用的高成本模擬結果。"""
+"""跨測試共用的高成本模擬結果與離線斷言。"""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -9,12 +10,14 @@ from simgrasp3d.models.perception import PerceptionResult
 from simgrasp3d.perception import analyze_rgbd_geometry, load_perception_spec
 from simgrasp3d.scene.builder import build_scene, load_scene_spec
 from simgrasp3d.sensors.rgbd import simulate_rgbd
-from simgrasp3d.simulation.hose_motion import load_hose_motion_spec, simulate_hose_motion
+from simgrasp3d.simulation.hose_motion import (
+    load_hose_motion_spec,
+    simulate_hose_motion,
+)
 from simgrasp3d.simulation.mujoco_hose import (
     load_mujoco_hose_spec,
     simulate_mujoco_hose,
 )
-
 
 SCENE_CONFIG_PATH = Path("configs/scenes/tabletop_demo.json")
 MOTION_CONFIG_PATH = Path("configs/motions/hose_extraction_demo.json")
@@ -52,3 +55,12 @@ def perception_result() -> PerceptionResult:
         load_perception_spec(PERCEPTION_CONFIG_PATH),
         table_top_z,
     )
+
+
+def assert_offline_page(page: Path) -> None:
+    """頁面只能載入同一輸出樹內、實際存在的本機腳本。"""
+
+    sources = re.findall(r'<script[^>]*\bsrc="([^"]+)"', page.read_text(encoding="utf-8"))
+    for source in sources:
+        assert "://" not in source, f"不得引用外部資源：{source}"
+        assert (page.parent / source).is_file(), f"缺少本機資源：{source}"

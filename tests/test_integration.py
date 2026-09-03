@@ -12,7 +12,6 @@ from simgrasp3d.models.perception import PerceptionResult
 from simgrasp3d.robot.description import build_srdf, build_urdf
 from simgrasp3d.scene.builder import load_scene_spec
 
-
 SCENE_CONFIG_PATH = Path("configs/scenes/tabletop_demo.json")
 INTEGRATION_CONFIG_PATH = Path("configs/integration/fail_closed_baseline.json")
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -163,20 +161,3 @@ def build_physics_comparison_figure(
     )
     return figure
 
-
-def write_physics_comparison_html(
-    kinematic: TrajectoryData,
-    sweep: PhysicsSweepData,
-    output_path: str | Path,
-) -> Path:
-    """輸出可離線開啟的物理比較頁面。"""
-
-    destination = Path(output_path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    build_physics_comparison_figure(kinematic, sweep).write_html(
-        destination,
-        include_plotlyjs=True,
-        full_html=True,
-        config={"displaylogo": False, "responsive": True, "scrollZoom": True},
-    )
-    return destination

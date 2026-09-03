@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import json
+import itertools
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 
 from simgrasp3d.geometry.collision import segment_distance
+from simgrasp3d.io import load_spec
 from simgrasp3d.models.motion import PipeObstacleSpec, TrajectoryData, TrajectoryFrame
 from simgrasp3d.models.physics import (
     MujocoHoseSpec,
@@ -33,8 +34,7 @@ class _ContactSnapshot:
 def load_mujoco_hose_spec(path: str | Path) -> MujocoHoseSpec:
     """讀取並驗證 MuJoCo 軟管 baseline JSON。"""
 
-    with Path(path).open("r", encoding="utf-8") as stream:
-        return MujocoHoseSpec.from_dict(json.load(stream))
+    return load_spec(path, MujocoHoseSpec)
 
 
 def _require_mujoco() -> Any:
@@ -399,7 +399,7 @@ def simulate_mujoco_hose(
         [frame.hose_length_ratio for frame in result_frames]
     )
     node_speeds = [0.0]
-    for previous, current in zip(result_frames[:-1], result_frames[1:], strict=True):
+    for previous, current in itertools.pairwise(result_frames):
         delta_time = current.time_s - previous.time_s
         node_speeds.append(
             float(

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import numpy as np
 
+from simgrasp3d.io import load_spec
 from simgrasp3d.models.perception import (
     BoundingBox3D,
     GraspCandidate,
@@ -21,8 +21,7 @@ from simgrasp3d.sensors.rgbd import RGBDFrame
 def load_perception_spec(path: str | Path) -> PerceptionSpec:
     """讀取並驗證 RGB-D 幾何分析設定。"""
 
-    with Path(path).open("r", encoding="utf-8") as stream:
-        return PerceptionSpec.from_dict(json.load(stream))
+    return load_spec(path, PerceptionSpec)
 
 
 def _fit_table_plane(points: np.ndarray, spec: PerceptionSpec) -> PlaneEstimate:

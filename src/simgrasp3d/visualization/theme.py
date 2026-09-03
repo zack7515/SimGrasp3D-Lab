@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 VACUUM = "#11181D"
 TITANIUM = "#2A3942"
 SLATE = "#60727A"

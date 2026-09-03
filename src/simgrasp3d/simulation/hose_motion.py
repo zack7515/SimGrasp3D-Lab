@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import json
+import itertools
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +16,7 @@ from simgrasp3d.geometry.transforms import (
     quaternion_slerp,
     rpy_deg_from_matrix,
 )
+from simgrasp3d.io import load_spec
 from simgrasp3d.models.motion import (
     HoseMotionSpec,
     MotionKeyframeSpec,
@@ -45,10 +46,7 @@ class _MotionState:
 def load_hose_motion_spec(path: str | Path) -> HoseMotionSpec:
     """讀取並驗證 UTF-8 JSON 軟管動作情境。"""
 
-    config_path = Path(path)
-    with config_path.open("r", encoding="utf-8") as stream:
-        data = json.load(stream)
-    return HoseMotionSpec.from_dict(data)
+    return load_spec(path, HoseMotionSpec)
 
 
 def _resample_polyline(
@@ -76,27 +74,36 @@ def _project_outside_obstacles(
 ) -> None:
     """將穿入固定管路的節點投影回圓柱外側。"""
 
+    # 同一個障礙下每個節點的投影彼此獨立，因此整批計算而非逐點呼叫 numpy。
     for obstacle in obstacles:
         start = np.asarray(obstacle.start, dtype=np.float64)
         end = np.asarray(obstacle.end, dtype=np.float64)
         required_distance = obstacle.radius + hose_radius
-        for index, node in enumerate(nodes):
-            if index == pinned_index:
-                continue
-            closest = closest_point_on_segment(node, start, end)
-            radial = node - closest
-            distance = float(np.linalg.norm(radial))
-            if distance >= required_distance:
-                continue
-            if distance <= 1e-9:
-                axis = end - start
-                fallback = np.cross(axis, np.asarray([0.0, 0.0, 1.0]))
-                if np.linalg.norm(fallback) <= 1e-9:
-                    fallback = np.asarray([1.0, 0.0, 0.0])
-                radial = fallback / np.linalg.norm(fallback)
-            else:
-                radial /= distance
-            nodes[index] = closest + radial * required_distance
+        axis = end - start
+        squared_length = float(axis @ axis)
+        if squared_length <= 1e-12:
+            closest = np.broadcast_to(start, nodes.shape).copy()
+        else:
+            parameter = np.clip((nodes - start) @ axis / squared_length, 0.0, 1.0)
+            closest = start + parameter[:, None] * axis
+        radial = nodes - closest
+        distance = np.linalg.norm(radial, axis=1)
+        inside = distance < required_distance
+        if pinned_index is not None:
+            inside[pinned_index] = False
+        if not inside.any():
+            continue
+        degenerate = inside & (distance <= 1e-9)
+        if degenerate.any():
+            fallback = np.cross(axis, np.asarray([0.0, 0.0, 1.0]))
+            if np.linalg.norm(fallback) <= 1e-9:
+                fallback = np.asarray([1.0, 0.0, 0.0])
+            radial[degenerate] = fallback / np.linalg.norm(fallback)
+            distance[degenerate] = 1.0
+        nodes[inside] = (
+            closest[inside] + radial[inside] / distance[inside, None] * required_distance
+        )
+
 
 def _project_segment_samples(
     nodes: np.ndarray,
@@ -254,7 +261,7 @@ def _interpolated_states(
         )
     ]
     time_s = 0.0
-    for previous, target in zip(keyframes[:-1], keyframes[1:], strict=True):
+    for previous, target in itertools.pairwise(keyframes):
         steps = max(1, int(round(target.duration_s * frame_rate_hz)))
         previous_rotation = pose_matrix(
             (0.0, 0.0, 0.0), previous.tcp_rpy_deg

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from conftest import assert_offline_page
 from simgrasp3d.integration import build_fail_closed_replay, load_integration_spec
 from simgrasp3d.models.motion import TrajectoryData
 from simgrasp3d.models.perception import PerceptionResult
@@ -9,7 +10,6 @@ from simgrasp3d.models.physics import PhysicsSweepCase, PhysicsSweepData
 from simgrasp3d.scene.builder import build_scene, load_scene_spec
 from simgrasp3d.sensors.rgbd import simulate_rgbd
 from simgrasp3d.visualization.simulation_report import write_simulation_report
-
 
 CONFIG_PATH = Path("configs/scenes/tabletop_demo.json")
 INTEGRATION_CONFIG_PATH = Path("configs/integration/fail_closed_baseline.json")
@@ -44,7 +44,7 @@ def test_report_contains_all_views_scenario_and_metrics(
     assert "collision_frame_count" in content
     assert "7.71 mm" in content
     assert "19.84 mm" in content
-    assert "<script src=" not in content
+    assert_offline_page(path)
     for metric_name in result.metrics:
         assert metric_name in content
 

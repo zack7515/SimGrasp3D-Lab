@@ -12,7 +12,6 @@ from simgrasp3d.simulation.system_design import (
 )
 from simgrasp3d.visualization.home_dashboard import write_home_dashboard
 
-
 SCENE_CONFIG = Path("configs/scenes/tabletop_demo.json")
 MOTION_CONFIG = Path("configs/motions/hose_extraction_demo.json")
 DESIGN_CONFIG = Path("configs/learning/system_design_lab.json")

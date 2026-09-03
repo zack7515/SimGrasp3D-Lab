@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
-from simgrasp3d.geometry.sampling import PointCloud, sample_box, sample_cylinder, sample_sphere
+from simgrasp3d.geometry.sampling import (
+    PointCloud,
+    sample_box,
+    sample_cylinder,
+    sample_sphere,
+)
 from simgrasp3d.geometry.transforms import pose_matrix, transform_points
+from simgrasp3d.io import load_spec
 from simgrasp3d.models.specs import CameraSpec, ObjectSpec, SceneSpec
 from simgrasp3d.robot.kinematics import RobotState, build_robot_state
 
@@ -28,10 +33,7 @@ class SceneData:
 def load_scene_spec(path: str | Path) -> SceneSpec:
     """讀取並驗證 UTF-8 JSON 場景設定。"""
 
-    config_path = Path(path)
-    with config_path.open("r", encoding="utf-8") as stream:
-        data = json.load(stream)
-    return SceneSpec.from_dict(data)
+    return load_spec(path, SceneSpec)
 
 
 def _sample_object(spec: ObjectSpec, rng: np.random.Generator) -> PointCloud:

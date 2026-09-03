@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import plotly.graph_objects as go
 
@@ -179,17 +177,3 @@ def build_figure(scene_data: SceneData) -> go.Figure:
     )
     return figure
 
-
-def write_scene_html(scene_data: SceneData, output_path: str | Path) -> Path:
-    """輸出包含 Plotly runtime 的自包含 HTML。"""
-
-    destination = Path(output_path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    figure = build_figure(scene_data)
-    figure.write_html(
-        destination,
-        include_plotlyjs=True,
-        full_html=True,
-        config={"displaylogo": False, "responsive": True, "scrollZoom": True},
-    )
-    return destination

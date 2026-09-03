@@ -7,7 +7,6 @@ from typing import Any, Literal
 
 import numpy as np
 
-
 MetricDirection = Literal["maximum", "minimum", "exact", "informational"]
 AssetKind = Literal["box", "zone", "polyline"]
 TrackStyle = Literal["markers", "lines", "lines+markers"]

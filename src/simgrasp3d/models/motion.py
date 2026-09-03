@@ -7,7 +7,6 @@ from typing import Any
 
 import numpy as np
 
-
 Vector3 = tuple[float, float, float]
 Color = tuple[float, float, float]
 

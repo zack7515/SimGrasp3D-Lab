@@ -24,6 +24,10 @@ simgrasp3d = "simgrasp3d.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"simgrasp3d.visualization" = ["static/*.css", "static/*.js"]
+
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+

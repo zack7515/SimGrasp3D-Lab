@@ -10,7 +10,6 @@ from simgrasp3d.models.specs import CameraSpec
 from simgrasp3d.scene.builder import build_scene, load_scene_spec
 from simgrasp3d.sensors.rgbd import project_point_clouds, simulate_rgbd
 
-
 CONFIG_PATH = Path("configs/scenes/tabletop_demo.json")
 
 

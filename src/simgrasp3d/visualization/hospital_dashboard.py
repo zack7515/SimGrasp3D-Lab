@@ -9,7 +9,6 @@ from typing import Any
 import numpy as np
 import plotly.graph_objects as go
 from plotly.io import to_html
-from plotly.offline import get_plotlyjs
 from plotly.subplots import make_subplots
 
 from simgrasp3d.models.hospital import (
@@ -19,28 +18,13 @@ from simgrasp3d.models.hospital import (
     HospitalSuiteResult,
     HospitalTrack,
 )
+from simgrasp3d.visualization.assets import read_asset, write_plotly_asset
 from simgrasp3d.visualization.theme import MONO_FONT
 
-
-_CSS = """
-:root{--ink:#17242b;--graphite:#23323a;--steel:#647780;--paper:#f6f8f7;--sterile:#e5eeec;--line:#cad7d4;--blue:#227c9d;--teal:#0a9b83;--teal-soft:#d8eee9;--coral:#d95d50;--coral-soft:#f8dfdc;--iodine:#d89a35;--iodine-soft:#f5e9d3;--display:"Bahnschrift SemiCondensed","DIN Alternate","Arial Narrow",sans-serif;--body:Aptos,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;--mono:"JetBrains Mono","IBM Plex Mono",Consolas,monospace}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:var(--sterile);font-family:var(--body);line-height:1.5}a{color:inherit}a:focus-visible{outline:3px solid var(--iodine);outline-offset:3px}.skip{position:fixed;z-index:100;top:8px;left:8px;padding:8px 12px;background:#fff;transform:translateY(-180%)}.skip:focus{transform:none}
-.topbar{position:sticky;z-index:30;top:0;display:flex;justify-content:space-between;align-items:center;gap:20px;min-height:48px;padding:0 24px;color:#eef8f6;background:rgba(23,36,43,.96);border-bottom:1px solid #3d515a;backdrop-filter:blur(12px)}.brand,.case-state,.eyebrow,.badge,.metric-key,.event-time,.case-code{font-family:var(--mono);text-transform:uppercase;letter-spacing:.09em}.brand{color:inherit;font-size:10px;text-decoration:none}.brand+.brand{margin-left:10px;color:#8ce0d3}.case-state{color:#9fb3ba;font-size:9px}
-.layout{display:grid;grid-template-columns:216px minmax(0,1fr);min-height:calc(100vh - 48px)}.spine{position:sticky;top:48px;align-self:start;height:calc(100vh - 48px);overflow-y:auto;padding:18px 14px 28px;color:#eaf3f2;background:var(--graphite);border-right:1px solid #49606a}.spine-label{margin:0 8px 14px;color:#88a0aa;font-family:var(--mono);font-size:9px;letter-spacing:.12em}.spine-link{position:relative;display:grid;grid-template-columns:32px 1fr;gap:9px;align-items:center;min-height:54px;padding:7px 6px;border-top:1px solid #40535b;color:#aebdc2;text-decoration:none}.spine-link:last-child{border-bottom:1px solid #40535b}.spine-link:hover,.spine-link.current{color:#fff;background:#2b3e47}.spine-link.current:after{content:"";position:absolute;top:8px;bottom:8px;right:-14px;width:4px;background:var(--teal)}.spine-index{display:grid;width:27px;height:27px;place-items:center;color:#fff;border:1px solid #6f858e;font-family:var(--mono);font-size:9px}.current .spine-index{color:var(--ink);background:#8ce0d3;border-color:#8ce0d3}.spine-copy strong,.spine-copy span{display:block}.spine-copy strong{font-size:11px}.spine-copy span{margin-top:2px;color:#7f969f;font-family:var(--mono);font-size:8px}
-.page{min-width:0}.hero{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:36px;min-height:275px;padding:38px clamp(24px,4vw,62px) 34px;color:#f5fbfa;background:var(--ink)}.hero:after{content:"";position:absolute;width:430px;height:430px;right:-155px;top:-250px;border:68px solid rgba(10,155,131,.18);border-radius:50%}.eyebrow{margin:0 0 12px;color:#8ce0d3;font-size:10px}.hero h1{margin:0;max-width:900px;font-family:var(--display);font-size:clamp(37px,5.5vw,72px);line-height:.92;letter-spacing:-.025em}.hero-summary{max-width:760px;margin:20px 0 0;color:#b9c9cd;font-size:14px}.hero-meta{position:relative;z-index:1;align-self:end;border-top:1px solid #43565f}.meta-row{display:grid;grid-template-columns:86px 1fr;gap:10px;padding:9px 0;border-bottom:1px solid #43565f;font-size:11px}.meta-row span{color:#8299a2;font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.1em}
-.safety{display:grid;grid-template-columns:180px 1fr;gap:18px;align-items:center;padding:13px clamp(24px,4vw,62px);color:#5b3b0c;background:var(--iodine-soft);border-bottom:1px solid #dfc48f}.safety strong{font-family:var(--mono);font-size:10px;letter-spacing:.08em}.safety span{font-size:12px}.content{padding:22px clamp(18px,3vw,44px) 44px}.section{margin-bottom:16px;border:1px solid var(--line);background:var(--paper);box-shadow:0 9px 25px rgba(23,36,43,.06)}.section-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-end;padding:14px 16px;border-bottom:1px solid var(--line);background:#fff}.section-head h2{margin:0;font-family:var(--display);font-size:20px}.section-head p{margin:2px 0 0;color:var(--steel);font-size:11px}.badge{flex:0 0 auto;padding:6px 9px;color:#0b6c5d;background:var(--teal-soft);font-size:8px}.plot{min-height:640px}.plot>div,.signal-plot>div{width:100%!important}.view-key{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}.view-key div{padding:10px 14px;color:var(--steel);font-size:10px}.view-key div+div{border-left:1px solid var(--line)}.view-key strong{color:var(--ink);font-family:var(--mono);font-size:9px}
-.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}.metric{position:relative;min-height:128px;padding:16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}.metric:before{content:"";position:absolute;top:0;right:0;left:0;height:3px;background:var(--steel)}.metric.pass:before{background:var(--teal)}.metric.fail:before{background:var(--coral)}.metric-key{color:var(--steel);font-size:8px}.metric-value{display:block;margin:15px 0 8px;font-family:var(--display);font-size:32px;line-height:1}.metric-limit{color:var(--steel);font-size:10px}.metric-status{float:right;font-family:var(--mono);font-size:9px}.pass .metric-status{color:#087565}.fail .metric-status{color:var(--coral)}.signal-plot{min-height:280px}.detail-grid{display:grid;grid-template-columns:1.15fr .85fr}.detail-grid>div{min-width:0;padding:16px}.detail-grid>div+div{border-left:1px solid var(--line)}.detail-grid h3{margin:0 0 10px;font-family:var(--display);font-size:16px}.event-table{width:100%;border-collapse:collapse;font-size:11px}.event-table td{padding:8px 7px;border-bottom:1px solid #dce5e2;vertical-align:top}.event-time{width:72px;color:var(--blue);font-size:8px}.assumptions{margin:0;padding-left:18px;color:#52656d;font-size:11px}.assumptions li+li{margin-top:8px}.pager{display:flex;justify-content:space-between;gap:12px;margin-top:22px}.pager a{min-width:145px;padding:12px 14px;color:#fff;background:var(--graphite);font-family:var(--mono);font-size:9px;text-decoration:none}.pager a:last-child{text-align:right}.disabled{visibility:hidden}
-@media(max-width:980px){.layout{grid-template-columns:1fr}.spine{position:static;display:flex;gap:4px;height:auto;padding:8px;overflow-x:auto}.spine-label{display:none}.spine-link{flex:0 0 122px;grid-template-columns:26px 1fr;border:1px solid #40535b}.spine-link.current:after{top:auto;right:7px;bottom:-8px;left:7px;width:auto;height:3px}.hero{grid-template-columns:1fr}.detail-grid{grid-template-columns:1fr}.detail-grid>div+div{border-left:0;border-top:1px solid var(--line)}}
-@media(max-width:650px){.topbar{padding:0 12px}.case-state{display:none}.hero{min-height:0;padding:30px 20px}.safety{grid-template-columns:1fr;gap:4px;padding:12px 20px}.content{padding:12px 8px 32px}.badge{display:none}.plot{min-height:560px}.view-key{grid-template-columns:1fr}.view-key div+div{border-left:0;border-top:1px solid var(--line)}}
-@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
-"""
+_CSS = read_asset("hospital.css")
 
 
-_INDEX_CSS = _CSS + """
-.index-hero{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);min-height:420px;color:#f4fbfa;background:var(--ink)}.index-copy{padding:clamp(38px,7vw,94px);align-self:end}.index-copy h1{margin:0;max-width:850px;font-family:var(--display);font-size:clamp(48px,8vw,108px);letter-spacing:-.035em;line-height:.83}.index-copy p:last-child{max-width:680px;margin:28px 0 0;color:#aebfc4;font-size:14px}.cover{position:relative;overflow:hidden;display:grid;align-content:center;padding:36px;background:#20343d;border-left:1px solid #47606a}.cover:before{content:"";position:absolute;width:390px;height:390px;top:-150px;right:-145px;border:64px solid rgba(10,155,131,.18);border-radius:50%}.cover-line{position:relative;display:grid;grid-template-columns:50px 1fr;gap:12px;padding:13px 0;border-top:1px solid #405761}.cover-line:last-child{border-bottom:1px solid #405761}.cover-line strong{font-family:var(--display);font-size:20px}.cover-line span{align-self:center;color:#86a0a9;font-family:var(--mono);font-size:9px}.notice{padding:14px clamp(24px,6vw,84px);color:#5c3d10;background:var(--iodine-soft);border-bottom:1px solid #dfc48f;font-size:12px}.index-main{width:min(1420px,100%);margin:0 auto;padding:34px clamp(16px,4vw,54px) 60px}.title-row{display:flex;justify-content:space-between;gap:24px;align-items:end;margin:0 0 16px}.title-row h2{margin:0;font-family:var(--display);font-size:28px}.title-row p{max-width:620px;margin:0;color:var(--steel);font-size:12px}.sequence{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));margin-bottom:32px;border:1px solid var(--line);background:#fff}.step{position:relative;min-width:0;padding:18px 12px;border-right:1px solid var(--line);text-decoration:none}.step:last-child{border-right:0}.step:before{content:"";position:absolute;top:0;right:0;left:0;height:4px;background:var(--teal);transform:scaleX(0);transform-origin:left;transition:transform .2s}.step:hover:before{transform:scaleX(1)}.case-code{color:var(--blue);font-size:9px}.step strong{display:block;min-height:42px;margin-top:10px;font-size:12px}.level{color:var(--steel);font-family:var(--mono);font-size:8px}.cases{display:grid;gap:12px}.case{display:grid;grid-template-columns:90px minmax(0,1.2fr) minmax(200px,.8fr) 130px;align-items:center;min-height:118px;color:inherit;background:var(--paper);border:1px solid var(--line);text-decoration:none;transition:transform .18s,box-shadow .18s}.case:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(23,36,43,.10)}.case-index{display:grid;height:100%;place-items:center;color:#fff;background:var(--graphite);font-family:var(--display);font-size:32px}.case-copy,.case-facts,.case-status{padding:18px}.case-copy h3{margin:0;font-family:var(--display);font-size:23px}.case-copy p{margin:7px 0 0;color:var(--steel);font-size:11px}.case-facts{display:grid;gap:7px;border-left:1px solid var(--line);font-size:10px}.fact{margin-right:8px;color:var(--steel);font-family:var(--mono);font-size:8px;text-transform:uppercase}.case-status{align-self:stretch;display:grid;align-content:center;justify-items:end;border-left:1px solid var(--line)}.status{padding:6px 8px;color:#087565;background:var(--teal-soft);font-family:var(--mono);font-size:8px}.status.fail{color:#9d3e35;background:var(--coral-soft)}.risk{margin-top:8px;color:var(--steel);font-family:var(--mono);font-size:8px;text-transform:uppercase}.matrix{width:100%;margin-top:34px;border-collapse:collapse;background:#fff;font-size:11px}.matrix th,.matrix td{padding:11px 12px;border:1px solid var(--line);text-align:left}.matrix th{color:var(--steel);font-family:var(--mono);font-size:8px;text-transform:uppercase}.back{display:inline-block;margin-top:22px;padding:11px 14px;color:#fff;background:var(--graphite);font-family:var(--mono);font-size:9px;text-decoration:none}
-.home-jump{display:inline-block;margin-bottom:18px;color:#8ce0d3;font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-decoration:none;text-transform:uppercase}
-@media(max-width:950px){.index-hero{grid-template-columns:1fr}.cover{border-left:0;border-top:1px solid #47606a}.sequence{grid-template-columns:repeat(4,1fr)}.case{grid-template-columns:64px 1fr 120px}.case-facts{display:none}}@media(max-width:620px){.index-copy{padding:42px 24px}.sequence{display:flex;overflow-x:auto}.step{flex:0 0 125px}.case{grid-template-columns:54px 1fr}.case-status{display:none}.matrix{display:block;overflow-x:auto;white-space:nowrap}.title-row{display:block}.title-row p{margin-top:8px}}
-"""
+_INDEX_CSS = _CSS + read_asset("hospital_index.css")
 
 
 def _asset_trace(asset: HospitalAsset, scene_name: str) -> Any:
@@ -217,6 +201,7 @@ def _write_case_page(
     suite: HospitalSuiteResult,
     case: HospitalCaseResult,
     destination: Path,
+    plotly_src: str,
 ) -> None:
     """輸出一個可離線開啟的案例分析頁。"""
 
@@ -257,7 +242,7 @@ def _write_case_page(
     )
     document = f"""<!doctype html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>H{case.spec.order} {escape(case.spec.title)}｜SimGrasp3D Hospital</title><style>{_CSS}</style><script>{get_plotlyjs()}</script></head>
+<title>H{case.spec.order} {escape(case.spec.title)}｜SimGrasp3D Hospital</title><style>{_CSS}</style><script src="{plotly_src}"></script></head>
 <body><a class="skip" href="#case-main">跳到案例內容</a>
 <header class="topbar"><div><a class="brand" href="../index.html">← SimGrasp3D main</a><a class="brand" href="index.html">Hospital learning suite</a></div><span class="case-state">SIMULATION ONLY · NOT FOR CLINICAL USE</span></header>
 <div class="layout"><aside class="spine" aria-label="案例病歷索引"><p class="spine-label">CASE CHART / 依序學習</p>{_spine(suite, case)}</aside>
@@ -325,17 +310,19 @@ def _write_index(suite: HospitalSuiteResult, destination: Path) -> None:
 def write_hospital_dashboard(
     output_dir: str | Path,
     suite: HospitalSuiteResult,
+    asset_root: str | Path | None = None,
 ) -> dict[str, Path]:
     """輸出多頁醫院模擬介面並回傳所有頁面路徑。"""
 
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
+    plotly_src = write_plotly_asset(destination / "index.html", asset_root)
     pages: dict[str, Path] = {}
     index_path = destination / "index.html"
     _write_index(suite, index_path)
     pages["index"] = index_path
     for case in suite.cases:
         path = destination / _case_filename(case)
-        _write_case_page(suite, case, path)
+        _write_case_page(suite, case, path, plotly_src)
         pages[case.spec.case_id] = path
     return pages

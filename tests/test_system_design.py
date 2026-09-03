@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from conftest import assert_offline_page
 from simgrasp3d.io.system_design import export_system_design_result
 from simgrasp3d.scene.builder import load_scene_spec
 from simgrasp3d.simulation.hose_motion import load_hose_motion_spec
@@ -11,7 +12,6 @@ from simgrasp3d.simulation.system_design import (
     simulate_system_design_lab,
 )
 from simgrasp3d.visualization.system_design_lab import write_system_design_lab
-
 
 DESIGN_CONFIG = Path("configs/learning/system_design_lab.json")
 SCENE_CONFIG = Path("configs/scenes/tabletop_demo.json")
@@ -73,7 +73,7 @@ def test_design_lab_is_self_contained_and_exports_inspectable_data(tmp_path: Pat
     assert "匯出實驗 CSV" in content
     assert "FAST GEOMETRY ESTIMATOR" in content
     assert "prefers-reduced-motion" in content
-    assert "<script src=" not in content
+    assert_offline_page(html_path)
     assert '"schema": "simgrasp3d.system_design_result.v1"' in payload
     assert '"simulation_only": true' in payload
 

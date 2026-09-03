@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
+from conftest import assert_offline_page
 from simgrasp3d.io.hospital import export_hospital_suite
 from simgrasp3d.simulation.hospital_cases import (
     load_hospital_suite_spec,
@@ -13,7 +14,6 @@ from simgrasp3d.visualization.hospital_dashboard import (
     build_hospital_case_figure,
     write_hospital_dashboard,
 )
-
 
 CONFIG_PATH = Path("configs/hospital/hospital_learning_suite.json")
 
@@ -56,7 +56,7 @@ def test_hospital_dashboard_exports_index_case_pages_and_data(tmp_path: Path) ->
     assert "教學安全閘門" in case_page
     assert "NOT FOR CLINICAL USE" in case_page
     assert "案例病歷索引" in case_page
-    assert "<script src=" not in case_page
+    assert_offline_page(page_paths["bedside_tubing"])
 
 
 def test_hospital_case_figure_has_synchronized_frames() -> None:

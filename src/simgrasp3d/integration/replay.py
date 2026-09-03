@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import numpy as np
 
+from simgrasp3d.io import load_spec
 from simgrasp3d.models.integration import (
     IntegrationSpec,
     ReplayEvent,
@@ -23,8 +23,7 @@ from simgrasp3d.robot.kinematics import solve_pose_ik
 def load_integration_spec(path: str | Path) -> IntegrationSpec:
     """讀取並驗證 fail-closed 安全門檻。"""
 
-    with Path(path).open("r", encoding="utf-8") as stream:
-        return IntegrationSpec.from_dict(json.load(stream))
+    return load_spec(path, IntegrationSpec)
 
 
 def _validated_grasp(

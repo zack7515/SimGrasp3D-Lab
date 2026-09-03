@@ -9,7 +9,7 @@ import numpy as np
 
 from simgrasp3d.geometry.sampling import PointCloud
 from simgrasp3d.io.point_cloud import write_ply
-from simgrasp3d.sensors.rgbd import RGBDFrame, RGBDSimulationResult, SCHEMA_VERSION
+from simgrasp3d.sensors.rgbd import SCHEMA_VERSION, RGBDFrame, RGBDSimulationResult
 
 
 def write_rgbd_frame(path: str | Path, frame: RGBDFrame) -> Path:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -118,19 +116,3 @@ def build_rgbd_comparison_figure(result: RGBDSimulationResult) -> go.Figure:
     figure.update_annotations(font={"size": 12, "color": AMBER})
     return figure
 
-
-def write_rgbd_comparison_html(
-    result: RGBDSimulationResult,
-    output_path: str | Path,
-) -> Path:
-    """將 RGB-D 比較圖輸出為自包含 HTML。"""
-
-    destination = Path(output_path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    build_rgbd_comparison_figure(result).write_html(
-        destination,
-        include_plotlyjs=True,
-        full_html=True,
-        config={"displaylogo": False, "responsive": True},
-    )
-    return destination

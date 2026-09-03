@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 from simgrasp3d.models.motion import PipeObstacleSpec, TrajectoryData, TrajectoryFrame
 from simgrasp3d.models.specs import RobotSpec, TableSpec
 from simgrasp3d.robot.collision import build_robot_capsules
+from simgrasp3d.visualization.assets import write_plotly_asset
 from simgrasp3d.visualization.theme import (
     AMBER,
     CERAMIC,
@@ -431,6 +432,7 @@ def write_motion_html(
     robot: RobotSpec,
     table: TableSpec,
     output_path: str | Path,
+    asset_root: str | Path | None = None,
 ) -> Path:
     """輸出可離線播放的自包含軟管動作頁面。"""
 
@@ -438,7 +440,7 @@ def write_motion_html(
     destination.parent.mkdir(parents=True, exist_ok=True)
     build_motion_figure(trajectory, robot, table).write_html(
         destination,
-        include_plotlyjs=True,
+        include_plotlyjs=write_plotly_asset(destination, asset_root),
         full_html=True,
         config={"displaylogo": False, "responsive": True, "scrollZoom": True},
     )

@@ -1,21 +1,22 @@
 """點雲、感測與運動時間序列的輸入輸出。"""
 
-from .point_cloud import export_scene_point_clouds, write_ply
-from .physics import export_physics_sweep
-from .perception import export_perception_result
-from .integration import export_replay_result
-from .hospital import export_hospital_suite
-from .system_design import export_system_design_result
-from .trajectory import export_trajectory, write_trajectory_npz
+from __future__ import annotations
 
-__all__ = [
-    "export_scene_point_clouds",
-    "export_physics_sweep",
-    "export_perception_result",
-    "export_replay_result",
-    "export_hospital_suite",
-    "export_system_design_result",
-    "export_trajectory",
-    "write_ply",
-    "write_trajectory_npz",
-]
+import json
+from pathlib import Path
+from typing import Protocol, TypeVar
+
+
+class _FromDict(Protocol):
+    @classmethod
+    def from_dict(cls, data: dict) -> _FromDict: ...
+
+
+SpecT = TypeVar("SpecT", bound=_FromDict)
+
+
+def load_spec(path: str | Path, spec_type: type[SpecT]) -> SpecT:
+    """讀取 UTF-8 JSON 設定並交給對應的 dataclass 驗證。"""
+
+    with Path(path).open("r", encoding="utf-8") as stream:
+        return spec_type.from_dict(json.load(stream))

@@ -8,19 +8,22 @@ import webbrowser
 from pathlib import Path
 
 from simgrasp3d.integration import build_fail_closed_replay, load_integration_spec
+from simgrasp3d.io.hospital import export_hospital_suite
 from simgrasp3d.io.integration import export_replay_result
 from simgrasp3d.io.perception import export_perception_result
 from simgrasp3d.io.physics import export_physics_sweep
-from simgrasp3d.io.rgbd_frame import export_rgbd_simulation
 from simgrasp3d.io.point_cloud import export_scene_point_clouds
-from simgrasp3d.io.trajectory import export_trajectory
-from simgrasp3d.io.hospital import export_hospital_suite
+from simgrasp3d.io.rgbd_frame import export_rgbd_simulation
 from simgrasp3d.io.system_design import export_system_design_result
-from simgrasp3d.scene.builder import build_scene, load_scene_spec
+from simgrasp3d.io.trajectory import export_trajectory
 from simgrasp3d.perception import analyze_rgbd_geometry, load_perception_spec
 from simgrasp3d.robot.description import export_robot_description
+from simgrasp3d.scene.builder import build_scene, load_scene_spec
 from simgrasp3d.sensors.rgbd import simulate_rgbd
-from simgrasp3d.simulation.hose_motion import load_hose_motion_spec, simulate_hose_motion
+from simgrasp3d.simulation.hose_motion import (
+    load_hose_motion_spec,
+    simulate_hose_motion,
+)
 from simgrasp3d.simulation.hospital_cases import (
     load_hospital_suite_spec,
     simulate_hospital_suite,
@@ -33,13 +36,9 @@ from simgrasp3d.simulation.system_design import (
     load_system_design_spec,
     simulate_system_design_lab,
 )
-from simgrasp3d.visualization.motion_viewer import write_motion_html
-from simgrasp3d.visualization.hospital_dashboard import write_hospital_dashboard
 from simgrasp3d.visualization.home_dashboard import write_home_dashboard
-from simgrasp3d.visualization.perception_viewer import write_perception_html
-from simgrasp3d.visualization.physics_viewer import write_physics_comparison_html
-from simgrasp3d.visualization.plotly_viewer import write_scene_html
-from simgrasp3d.visualization.rgbd_viewer import write_rgbd_comparison_html
+from simgrasp3d.visualization.hospital_dashboard import write_hospital_dashboard
+from simgrasp3d.visualization.motion_viewer import write_motion_html
 from simgrasp3d.visualization.simulation_report import write_simulation_report
 from simgrasp3d.visualization.system_design_lab import write_system_design_lab
 
@@ -55,12 +54,6 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("configs/scenes/tabletop_demo.json"),
         help="場景 JSON 設定檔",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=Path("outputs/tabletop_scene.html"),
-        help="互動式 HTML 輸出路徑",
     )
     parser.add_argument(
         "--point-cloud-dir",
@@ -91,12 +84,6 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("configs/motions/hose_extraction_demo.json"),
         help="軟管連續動作 JSON 設定檔",
-    )
-    parser.add_argument(
-        "--motion-output",
-        type=Path,
-        default=Path("outputs/hose_motion.html"),
-        help="可離線播放的軟管連續動作 HTML 路徑",
     )
     parser.add_argument(
         "--motion-output-dir",
@@ -222,9 +209,9 @@ def main(argv: list[str] | None = None) -> int:
     """執行場景建立流程並輸出摘要。"""
 
     args = build_parser().parse_args(argv)
+    asset_root = args.home_output.parent
     spec = load_scene_spec(args.config)
     scene_data = build_scene(spec)
-    html_path = write_scene_html(scene_data, args.output).resolve()
 
     exported_count = 0
     if not args.no_export_point_clouds:
@@ -239,7 +226,6 @@ def main(argv: list[str] | None = None) -> int:
         "TCP 世界座標："
         f"({tool_position[0]:.4f}, {tool_position[1]:.4f}, {tool_position[2]:.4f}) m"
     )
-    print(f"互動式視覺化：{html_path}")
     if exported_count:
         print(f"PLY 點雲：{args.point_cloud_dir.resolve()}（{exported_count} 個檔案）")
 
@@ -258,6 +244,7 @@ def main(argv: list[str] | None = None) -> int:
             spec,
             design_motion_spec,
             args.design_output,
+            asset_root,
         ).resolve()
         design_data_path = export_system_design_result(
             args.design_data_output,
@@ -268,18 +255,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"系統設計工作台：基準 {passed}/{total} 閘門通過｜{design_path}")
         print(f"系統設計資料：{design_data_path}")
 
-    motion_path: Path | None = None
     motion_trajectory = None
     if not args.no_simulate_motion:
         motion_spec = load_hose_motion_spec(args.motion_config)
         motion_trajectory = simulate_hose_motion(motion_spec, spec.robot)
         motion_paths = export_trajectory(args.motion_output_dir, motion_trajectory)
-        motion_path = write_motion_html(
-            motion_trajectory,
-            spec.robot,
-            spec.table,
-            args.motion_output,
-        ).resolve()
         motion_metrics = motion_trajectory.metrics
         print(
             "連續動作："
@@ -291,17 +271,12 @@ def main(argv: list[str] | None = None) -> int:
             f"{motion_metrics['collision_frame_count']}｜"
             f"軟管接觸={motion_metrics['hose_contact_frame_count']}"
         )
-        print(f"軟管動畫：{motion_path}")
         print(f"逐幀軌跡：{motion_paths['trajectory'].resolve()}")
 
     sensor_result = None
     if not args.no_simulate_rgbd:
         sensor_result = simulate_rgbd(scene_data)
         sensor_paths = export_rgbd_simulation(args.sensor_output_dir, sensor_result)
-        comparison_path = write_rgbd_comparison_html(
-            sensor_result,
-            args.sensor_output_dir / "rgbd_comparison.html",
-        ).resolve()
         metrics = sensor_result.metrics
         print(
             "RGB-D 誤差："
@@ -310,7 +285,6 @@ def main(argv: list[str] | None = None) -> int:
             f"有效點={metrics['observation_valid_pixels']}"
         )
         print(f"RGB-D frame：{sensor_paths['observation_frame'].resolve()}")
-        print(f"RGB-D 比較：{comparison_path}")
 
     physics_sweep = None
     if motion_trajectory is not None and not args.no_simulate_physics:
@@ -322,11 +296,7 @@ def main(argv: list[str] | None = None) -> int:
             spec.robot,
             spec.table,
             args.physics_output_dir / "hose_physics.html",
-        ).resolve()
-        physics_comparison_path = write_physics_comparison_html(
-            motion_trajectory,
-            physics_sweep,
-            args.physics_output_dir / "comparison.html",
+            asset_root,
         ).resolve()
         physics_metrics = physics_sweep.baseline.metrics
         print(
@@ -337,7 +307,6 @@ def main(argv: list[str] | None = None) -> int:
             f"敏感度案例={len(physics_sweep.cases)}"
         )
         print(f"物理動畫：{physics_motion_path}")
-        print(f"物理比較：{physics_comparison_path}")
         print(f"物理資料：{physics_paths['trajectory'].resolve()}")
 
     perception_result = None
@@ -354,11 +323,6 @@ def main(argv: list[str] | None = None) -> int:
             args.perception_output_dir,
             perception_result,
         )
-        perception_html = write_perception_html(
-            sensor_result.observation,
-            perception_result,
-            args.perception_output_dir / "geometry.html",
-        ).resolve()
         perception_metrics = perception_result.metrics
         print(
             "RGB-D 幾何："
@@ -368,7 +332,6 @@ def main(argv: list[str] | None = None) -> int:
             f"桌面 RMS={perception_metrics['table_plane_rms_error_m'] * 1000.0:.2f} mm"
         )
         print(f"感知結果：{perception_paths['geometry'].resolve()}")
-        print(f"感知視覺化：{perception_html}")
 
     replay_result = None
     if (
@@ -412,6 +375,7 @@ def main(argv: list[str] | None = None) -> int:
         hospital_pages = write_hospital_dashboard(
             args.hospital_output_dir,
             hospital_suite,
+            asset_root,
         )
         hospital_index = hospital_pages["index"].resolve()
         failed_metrics = sum(
@@ -454,6 +418,7 @@ def main(argv: list[str] | None = None) -> int:
             hospital_dashboard_href=hospital_href,
             system_design_href=design_href,
             home_href=home_href,
+            asset_root=asset_root,
         ).resolve()
         print(f"單頁驗證報告：{report_path}")
 

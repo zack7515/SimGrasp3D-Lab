@@ -10,7 +10,6 @@ from simgrasp3d.models.motion import TrajectoryData
 from simgrasp3d.scene.builder import load_scene_spec
 from simgrasp3d.visualization.motion_viewer import build_motion_figure
 
-
 SCENE_CONFIG_PATH = Path("configs/scenes/tabletop_demo.json")
 
 

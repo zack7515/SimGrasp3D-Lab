@@ -11,7 +11,6 @@ from simgrasp3d.scene.builder import build_scene, load_scene_spec
 from simgrasp3d.sensors.rgbd import simulate_rgbd
 from simgrasp3d.visualization.perception_viewer import build_perception_figure
 
-
 SCENE_CONFIG_PATH = Path("configs/scenes/tabletop_demo.json")
 
 

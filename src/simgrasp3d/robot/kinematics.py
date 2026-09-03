@@ -108,7 +108,7 @@ def solve_position_ik(
     epsilon_deg = 0.08
     iteration = 0
 
-    for iteration in range(1, max_iterations + 1):
+    for iteration in range(1, max_iterations + 1):  # noqa: B007 迴圈結束後回報實際疊代次數
         positions, _, tool_frame = forward_kinematics(robot, angles)
         error = target - tool_frame[:3, 3]
         if float(np.linalg.norm(error)) <= tolerance_m:
@@ -183,7 +183,7 @@ def solve_pose_ik(
     orientation_tolerance_rad = np.deg2rad(orientation_tolerance_deg)
     iteration = 0
 
-    for iteration in range(1, max_iterations + 1):
+    for iteration in range(1, max_iterations + 1):  # noqa: B007 迴圈結束後回報實際疊代次數
         _, _, tool_frame = forward_kinematics(robot, angles)
         position_error = target - tool_frame[:3, 3]
         orientation_error = rotation_vector_from_matrix(

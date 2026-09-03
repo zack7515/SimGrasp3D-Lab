@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-
 Vector3 = tuple[float, float, float]
 Color = tuple[float, float, float]
 

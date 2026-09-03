@@ -9,7 +9,6 @@ import numpy as np
 
 from simgrasp3d.models.motion import TrajectoryData
 
-
 MOTION_SCHEMA_VERSION = "3.0"
 
 
