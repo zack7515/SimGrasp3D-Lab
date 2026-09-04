@@ -8,11 +8,8 @@ if ((${#staged_files[@]} == 0)); then
   exit 0
 fi
 
-blocked_name_pattern='(co''dex|cl''aude|g''utc)'
-blocked_content_pattern='(co''dex|cl''aude|g''utc|co-''authored-by|co-''author)'
-email_pattern='[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}'
-home_path_pattern='/(home|Users)/[^/[:space:]]+'
-secret_pattern='(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,})'
+# shellcheck source=.githooks/privacy-patterns.sh
+source "$(dirname "$0")/privacy-patterns.sh"
 
 failed=0
 

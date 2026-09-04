@@ -16,6 +16,12 @@ Repository 已提供 staged-content 與 commit-message hooks。Clone 後執行�
 git config core.hooksPath .githooks
 ```
 
+兩個 hook 與 CI 共用 `.githooks/privacy-patterns.sh` 的規則。要一次檢查全部版控檔案：
+
+```bash
+.githooks/scan-tracked.sh
+```
+
 ## 模擬結果規範
 
 - 所有本專案產生的結果應標示模擬器、場景版本、random seed、模型版本及主要物理參數。

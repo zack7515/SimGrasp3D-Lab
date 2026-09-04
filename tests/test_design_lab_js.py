@@ -54,6 +54,7 @@ def test_js_segment_distance_matches_python() -> None:
         capture_output=True,
         text=True,
         check=True,
+        timeout=60,
     )
     from_js = np.asarray(json.loads(completed.stdout))
     from_python = np.asarray(

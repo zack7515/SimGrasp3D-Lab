@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10", "ruff>=0.6,<1"]
+dev = ["pytest>=8,<10", "ruff==0.16.5"]
 
 [project.scripts]
 simgrasp3d = "simgrasp3d.cli:main"
@@ -28,7 +28,7 @@ where = ["src"]
 "simgrasp3d.visualization" = ["static/*.css", "static/*.js"]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "-q -ra"
 testpaths = ["tests"]
 
 [tool.ruff]
